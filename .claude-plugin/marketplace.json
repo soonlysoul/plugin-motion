@@ -1,0 +1,14 @@
+{
+  "name": "plugin-motion",
+  "description": "Local marketplace for the plugin-motion Claude Code plugin.",
+  "owner": {
+    "name": "Soon"
+  },
+  "plugins": [
+    {
+      "name": "plugin-motion",
+      "source": "./",
+      "description": "Make Remotion motion-design videos storyboard-first: set up a checked video project, storyboard a brief, build each scene in a render-and-review loop, sync animations to a voiceover, and render a final MP4 verified against the storyboard."
+    }
+  ]
+}
