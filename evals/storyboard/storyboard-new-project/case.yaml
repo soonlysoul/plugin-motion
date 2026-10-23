@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "name": "storyboard-new-project",
+  "description": "Demande voisine que Soon tape hors de tout projet vidéo (US-1) : créer un projet n'est pas le storyboarder ; le dossier ne contient pas de storyboard.md.",
+  "tags": [
+    "storyboard",
+    "negative"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill storyboard n'est pas invoqué ; la réponse traite de la création du projet Remotion et ne propose ni storyboard ni scènes.",
+  "execution": {
+    "prompt": "Crée-moi un nouveau projet vidéo Remotion dans ~/Vidéos/motion/test.",
+    "max_turns": 6,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-not-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?storyboard\"",
+      "min": 0,
+      "max": 0,
+      "arm": "both"
+    },
+    {
+      "name": "about-the-project",
+      "type": "llm",
+      "criteria": "PASS if the final reply deals with creating a Remotion project in ~/Vidéos/motion/test (a creation command, the steps, or the fact that it cannot run commands here); naming the storyboard as a later step is fine.\nFAIL if it proposes a storyboard or a list of scenes, or asks for a video brief (audience, tone, duration) instead.\n"
+    }
+  ]
+}

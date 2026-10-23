@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "name": "storyboard-change-scene",
+  "description": "Demande de Soon, telle qu'il la tape (US-2, US-7), sur un storyboard de trois scènes déjà avancé : une scène validée change de contenu.",
+  "tags": [
+    "storyboard",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill storyboard est invoqué ; il annonce les trois scènes et leur statut, fait montrer le logo à la scène 2 (Message) au lieu du slogan, la repasse en « à faire », laisse les deux autres telles quelles et demande l'accord de Soon, sans toucher au code.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "La scène 2 doit montrer le logo plutôt que le slogan, mets le plan à jour.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?storyboard\""
+    },
+    {
+      "name": "scene-back-to-do",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all four: (1) reports the state of the video read from storyboard.md, with its three scenes and their status (Ouverture validée, Message validée, Final construite); (2) changes scene 2, Message, so that it shows the logo instead of the slogan, and sets its status back to « à faire »; (3) keeps scenes 1 and 3, Ouverture and Final, as they were, with their status; (4) asks Soon to approve the updated plan, and neither edits nor proposes to edit code under src/ now.\nFAIL if any of the four is missing, if scene 2 keeps the status « validée », or if another scene changes.\n"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "name": "storyboard-brief-vertical",
+  "description": "Brief de Soon, tel qu'il le tape (US-2, US-7), dans un projet vidéo neuf : un format vertical autre que celui de storyboard.md ; le public et le ton manquent au brief.",
+  "tags": [
+    "storyboard",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill storyboard est invoqué ; il annonce l'état de storyboard.md (aucune scène), retient le format vertical 1080×1920 au lieu de 1920×1080, reprend la durée en images (450) et pose une seule question, sur le public, sans découper la vidéo ni écrire de code.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Voici le brief : une vidéo verticale de 15 secondes qui annonce la sortie de ma newsletter. Prépare le plan scène par scène.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?storyboard\""
+    },
+    {
+      "name": "total-in-frames",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "\\b450\\s+images\\b",
+      "flags": "i"
+    },
+    {
+      "name": "one-question-first",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all four: (1) reports what storyboard.md holds now (no scene yet) and that the format becomes vertical 1080×1920 at 30 fps instead of the 1920×1080 it holds; (2) restates the 15-second total as 450 frames (« images »); (3) asks exactly one question, and that question is about the target audience (« public ») of the video; (4) proposes no scene yet and writes no code.\nFAIL if any of the four is missing, if it asks two questions or more, or if it already lists or describes scenes.\n"
+    }
+  ]
+}
