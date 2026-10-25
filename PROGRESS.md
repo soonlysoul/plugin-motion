@@ -5,7 +5,7 @@ Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Trois composants : l'agent `frame-reviewer` (US-4), le skill `storyboard` (US-2, US-7) et le skill `new-video` (US-1), avec `scripts/doctor.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées (voir `new-video`). Prochaine étape : ajouter le composant suivant, `/plugin-plugin:add`.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Trois composants : l'agent `frame-reviewer` (US-4), le skill `storyboard` (US-2, US-7) et le skill `new-video` (US-1), avec `scripts/doctor.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). Prochaine étape : ajouter le composant suivant, `/plugin-plugin:add`.
 
 ## Composants
 
@@ -215,7 +215,21 @@ diagnostic : 1 contrôle en échec, 1 avertissement ; rien n'a été modifié su
 exit 1
 ```
 
-Le même, avec `nspr`, `nss` et `expat` ajoutés à `NIX_LD_LIBRARY_PATH` pour ce seul processus : `essai de rendu : image 0 de MyComp rendue`, `diagnostic : prêt (1 avertissement)`, exit 0, en 4 s ; `git status` du projet inchangé. Reste à faire pour le critère 2 : appliquer la correction par plugin-nixos, puis `doctor.sh` doit sortir en 0 sans aide.
+Le même, avec `nspr`, `nss` et `expat` ajoutés à `NIX_LD_LIBRARY_PATH` pour ce seul processus : `essai de rendu : image 0 de MyComp rendue`, `diagnostic : prêt (1 avertissement)`, exit 0, en 4 s ; `git status` du projet inchangé.
+
+Correction appliquée le 2026-10-25 par `/plugin-nixos:modifie` : `nspr`, `nss` et `expat` dans `programs.nix-ld.libraries`, sous le domaine `developpement` (`conf-nixos/modules/programs/dev.nix`, commit `f29f0e4` du dépôt NixOS), appliquée par Soon. Critère 2 tenu, sur le même projet, sans aide :
+
+```
+$ bash scripts/doctor.sh …/scratchpad/probe/essai
+ok             node : v22.23.2, accepté par engines.node « ^20.19.0 || ^22.13.0 || >=24 »
+ok             ffmpeg : 8.1.2
+ok             ffprobe : 8.1.2
+ok             versions de Remotion : 4.0.538 pour 3 paquets (remotion et @remotion/*)
+ok             essai de rendu : image 0 de MyComp rendue
+avertissement  whisper : whisper-cli introuvable ; seul sync-voiceover en a besoin — correction : installer le paquet nixpkgs whisper-cpp via /plugin-nixos:modifie.
+diagnostic : prêt (1 avertissement)
+exit 0
+```
 
 #### Suite d'évaluation
 
