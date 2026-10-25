@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "name": "new-video-folder-not-empty",
+  "description": "Demande de Soon, telle qu'il la tape (US-1), qui désigne un dossier existant et non vide : ./promo contient déjà des notes et un logo. Le PRD refuse un dossier non vide.",
+  "tags": [
+    "new-video",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill new-video est invoqué ; il refuse ./promo parce que le dossier n'est pas vide, nomme ce qu'il contient, n'y crée rien et ne propose ni de le vider ni d'y créer quand même ; il propose un dossier vide, ~/Vidéos/motion/promo par défaut.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Crée-moi un nouveau projet vidéo Remotion dans ./promo.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?new-video\""
+    },
+    {
+      "name": "default-folder-instead",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "~/Vidéos/motion/promo\\b"
+    },
+    {
+      "name": "refuses-not-empty",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all three: (1) refuses to create the project in ./promo because that folder is not empty, and names at least one of the files it holds (notes.md, logo.svg); (2) creates nothing there and proposes neither to empty, move or overwrite its files, nor to create the project in ./promo anyway; (3) proposes an empty folder instead, namely ~/Vidéos/motion/promo, and asks Soon to confirm it or give another one.\nFAIL if any of the three is missing, or if it gives the creation commands to run in ./promo.\n"
+    }
+  ]
+}

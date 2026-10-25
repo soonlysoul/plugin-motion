@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "name": "new-video-default-folder",
+  "description": "Demande de Soon, telle qu'il la tape (US-1), hors de tout projet vidéo et sans dossier désigné : le skill propose l'emplacement par défaut tranché dans le PRD et s'arrête avant toute commande.",
+  "tags": [
+    "new-video",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill new-video est invoqué ; il propose de créer le projet dans ~/Vidéos/motion/<nom>, avec un nom tiré de la demande, et demande à Soon de confirmer ou de donner un autre dossier, sans rien créer ni lancer encore.",
+  "execution": {
+    "prompt": "Je commence une nouvelle vidéo pour le lancement de mon appli, prépare-moi le projet.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?new-video\""
+    },
+    {
+      "name": "default-folder",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "~/Vidéos/motion/[A-Za-z0-9][A-Za-z0-9._-]*"
+    },
+    {
+      "name": "asks-before-creating",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all three: (1) proposes to create the video project in a folder under ~/Vidéos/motion/, named after the video; (2) asks Soon to confirm that folder or to give another one, before anything is created; (3) neither says nor implies that the project already exists, and asks no question about the content of the video (audience, tone, duration, scenes).\nFAIL if any of the three is missing, if it proposes another default location than ~/Vidéos/motion/, or if it already lists creation steps as done.\n"
+    }
+  ]
+}
