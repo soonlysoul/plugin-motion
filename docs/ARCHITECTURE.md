@@ -132,7 +132,7 @@ Aucun en v1. Les vérifications déterministes sont des scripts appelés par les
 | Script | Rôle |
 | --- | --- |
 | `doctor.sh <projet>` | Une ligne par contrôle (`ok`, `manque`, `avertissement`), avec sa correction : Node à la version que demande Remotion ; ffmpeg et ffprobe ; versions identiques de `remotion` et de tous les `@remotion/*` de `package.json` ; essai de rendu d'une image. Si l'essai échoue, nomme la bibliothèque manquante quand l'erreur la donne et propose le plan B du PRD. `whisper-cpp` absent donne un avertissement, pas un échec, avec l'installation à demander à plugin-nixos. Sortie 0 si tous les contrôles obligatoires passent, 1 sinon. |
-| `preview.sh <projet> <Scene> <image>…` | Refuse une scène inconnue et une image hors de la durée de la scène ; rend chaque image demandée en `out/preview/<Scene>/f<NNNN>.png` avec la CLI Remotion, puis assemble `planche.png` avec le filtre ffmpeg `tile`. Affiche les chemins produits. Rendu image par image ou en séquence PNG : à mesurer à la création. |
+| `preview.sh <projet> <Scene> <image>…` | Refuse une scène inconnue et une image hors de la durée de la scène ; rend chaque image demandée en `out/preview/<Scene>/f<NNNN>.png` avec la CLI Remotion, puis assemble `planche.png` avec le filtre ffmpeg `tile`, chaque image étiquetée de son numéro sous l'image. Affiche les chemins produits. Un bundle du projet, puis un seul rendu de la liste d'images en séquence PNG (mesure ci-dessous). |
 | `probe.sh <projet> <mp4>` | Lit le format et les scènes de `storyboard.md`, lit le MP4 avec `ffprobe -print_format json`, compare la durée (à une image près), la cadence, la largeur et la hauteur, et la piste audio si une voix off est prévue. Verdict JSON (`conforme`, et l'écart de chaque contrôle) ; sortie 0 si conforme, 1 sinon. |
 
 ## Tests et évaluations
@@ -169,3 +169,4 @@ Aucun en v1. Les vérifications déterministes sont des scripts appelés par les
 - Skills déclenchés par leur description, bornés aux dossiers qui contiennent `storyboard.md` sauf `new-video` : le critère 6 teste ce déclenchement — 2026-10-23.
 - `frame-reviewer` sur `sonnet`, `opus` si le critère 4 échoue : jusqu'à 3 passages par scène, à ménager sur le quota — 2026-10-23.
 - `whisper-cpp` de nixpkgs plutôt que `@remotion/install-whisper-cpp` ou Whisper en Python : construit pour NixOS, sans compilation par projet ni PyTorch — 2026-10-23.
+- `preview.sh` rend la liste des images clés en un seul `remotion render --sequence --frames=<liste>` depuis un bundle : 1,8 s pour 6 images d'une scène de 240, contre 10,4 s image par image et 8,6 s pour la séquence entière ; le coût suit le nombre d'images, pas la longueur de la scène — 2026-10-25.

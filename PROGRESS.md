@@ -1,11 +1,11 @@
 # PROGRESS — plugin-motion
 
-Dernière mise à jour : 2026-10-25
+Dernière mise à jour : 2026-10-26
 Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Trois composants : l'agent `frame-reviewer` (US-4), le skill `storyboard` (US-2, US-7) et le skill `new-video` (US-1), avec `scripts/doctor.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). Prochaine étape : ajouter le composant suivant, `/plugin-plugin:add`.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Quatre composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1) et `build-scene` (US-3, US-4, US-7), avec `scripts/doctor.sh`, `scripts/preview.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). Prochaine étape : `render-video` et `probe.sh` par `/plugin-plugin:add` ; sa suite vérifie qu'il ne se déclenche pas avec le skill officiel `remotion-render`.
 
 ## Composants
 
@@ -268,3 +268,123 @@ exit 0
 Sans le skill, sur `./promo`, le témoin voit les deux fichiers mais propose de créer le projet à côté puis de le copier dedans (`cp -rn … ./promo/`) ; sans dossier désigné, il ne propose aucun emplacement par défaut. Avec le skill, les trois réponses proposent `~/Vidéos/motion/lancement-appli` et attendent la confirmation ; sur `./promo`, elles nomment `notes.md` et `logo.svg`, n'y touchent pas et proposent `~/Vidéos/motion/promo`.
 
 Coût en contexte permanent (`claude plugin details`) : ~120 tokens pour `new-video` (estimé ~100 ; ~140 avant réduction de la description), ~430 pour le plugin ; ~1,4k à chaque appel.
+
+### Skill `build-scene` — 2026-10-26
+
+Avec Bash (`preview.sh`) et l'agent `frame-reviewer`. Lit `storyboard.md`, annonce l'état des scènes, prend la scène nommée (identifiant ou numéro) ou la première qui n'est pas `validée` : une scène `construite` va droit à l'approbation de Soon, sans être reconstruite. Annonce la scène et ses images clés (0, milieu, dernière, fins d'entrée ; 8 au plus), écrit `src/scenes/<id>.tsx` avec les seules valeurs de `theme.ts`, l'inscrit dans `src/Root.tsx` avec la composition `Video` (`<Series>`), lance `preview.sh`, puis `frame-reviewer` avec le seul dossier, `storyboard.md` et l'identifiant ; écrit `review.md` par tour, corrige les défauts bloquants, 3 tours au plus ; passe la scène en `construite`, montre la planche et attend Soon pour `validée`.
+
+#### `preview.sh`, test d'abord
+
+Rouge, avant le script :
+
+```
+$ bash tests/static/test_preview.sh
+  ÉCHEC  scripts/preview.sh présent
+         absent
+test_preview : 0 réussis, 1 échoués, 0 sautés
+exit 1
+```
+
+Vert après une première version, une image par `remotion still` : `test_preview : 43 réussis, 0 échoués, 0 sautés`, exit 0.
+
+Mesure sur le poste (projet du scratchpad, scène `Message` de 240 images, texte animé), l'architecture laissant le choix ouvert :
+
+| Méthode | Temps |
+| --- | --- |
+| `remotion still` depuis les sources, 4 images | 41 s (un bundle par image) |
+| `remotion bundle`, une fois | 3,1 s |
+| puis `remotion still` × 6 depuis le bundle | 10,4 s |
+| puis `remotion render --sequence`, les 240 images | 8,6 s |
+| puis `remotion render --sequence --frames=0,8,15,70,120,239` | 1,8 s |
+
+La liste d'images de `--frames`, notée en 2026-10-24 d'après le skill officiel `remotion-render`, est constatée : Remotion rend exactement ces images, nommées selon `--image-sequence-pattern` mais complétées au nombre de chiffres de la plus grande (`f000.png`, `f239.png` ; `element-7.png` pour une seule). `preview.sh` rend donc dans un dossier temporaire et renomme en `f<NNNN>.png`. Test changé d'abord :
+
+```
+$ bash tests/static/test_preview.sh
+…
+  ÉCHEC  un seul rendu pour toutes les images
+  ÉCHEC  rend la scène depuis le bundle, en séquence, hors du projet
+  ÉCHEC  rend 0, 15 et 239, triées et sans doublon, en PNG
+…
+test_preview : 26 réussis, 19 échoués, 0 sautés
+exit 1
+```
+
+puis vert :
+
+```
+$ bash tests/static/test_preview.sh
+…
+test_preview : 45 réussis, 0 échoués, 0 sautés
+exit 0
+```
+
+Cas couverts : scène inconnue (et bloc json leurre après le premier), images hors durée, négatives, décimales, vides ou absentes ; un bundle hors du projet, un seul rendu, images triées et sans doublon ; un seul assemblage ffmpeg, dans l'ordre, par `tile`, chaque image étiquetée ; chemins affichés, planche en dernier ; images d'un tour précédent retirées, `review.md` gardé ; rendu en échec (exit 1, erreur de Remotion, renvoi à `src/Root.tsx`, pas de planche) ; storyboard absent, sans bloc json, illisible, durée absente. `shellcheck -S warning` : rien sur `preview.sh` ; sur le test, le seul SC2034 de `SUITE`, comme `test_doctor.sh`.
+
+Essai réel, sur le poste, sans aide :
+
+```
+$ time bash scripts/preview.sh …/scratchpad/projet Message 0 8 15 70 120 239
+…/out/preview/Message/f0000.png
+…/out/preview/Message/f0008.png
+…/out/preview/Message/f0015.png
+…/out/preview/Message/f0070.png
+…/out/preview/Message/f0120.png
+…/out/preview/Message/f0239.png
+…/out/preview/Message/planche.png
+real	0m5,212s
+exit 0
+$ bash scripts/preview.sh …/scratchpad/projet Message 240
+preview.sh : image 240 hors de la scène Message, qui dure 240 images : de 0 à 239.
+exit 2
+```
+
+Planche relue : 3 × 2 images, étiquetées sous l'image, identique à celle de la première version. L'image 70 montre un vrai chevauchement (« tout » agrandi mord la virgule) : une planche toute prête pour un essai de `frame-reviewer` sur une vraie scène.
+
+#### Suite d'évaluation
+
+`evals/build-scene/` : trois cas positifs (première scène d'un storyboard à faire ; reprise d'une vidéo dont `Message` est `construite` ; titre de la scène 3 qui déborde, `fontSize: 200` et `nowrap`), deux négatifs (MP4 final, toutes scènes validées ; scène ajoutée au plan). Trois exécutions, outils en lecture seule, sans Bash (choix de Soon) : les projets de test n'ont pas `node_modules`. `setup.sh` tirés d'un même générateur, autonomes. Lancement hors de `pp.sh eval-run`, `--scaffold` ajouté, verdict par `pp.sh eval-verdict`.
+
+Les sessions coûtent ici 0,35 à 0,58 USD, au-delà des 0,13 à 0,23 USD de l'estimation de `eval-plan` : le premier passage rouge a touché son plafond.
+
+Rouge, avant le skill (un bras ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'build-scene-*' --no-publish --max-cost-usd 4 --ablation none --scaffold --output-dir ./evals/results/build-scene-20261025T203717
+claude plugin eval : exit 2
+partiel : cost_ceiling ; résultats incomplets, à ne pas comparer
+ok : build-scene-add-scene (négatif) : WITH 1.00, Δ —
+rouge : build-scene-first-scene : WITH 0.33, Δ —
+rouge : build-scene-fix-overflow : WITH 0.00, Δ —
+rouge : build-scene-render-request : WITH 0.83, Δ —
+coût : 4,20 USD
+verdict : bloqué
+exit 2
+$ claude plugin eval . --case 'build-scene-re*' --no-publish --max-cost-usd 4 --ablation none --scaffold --output-dir ./evals/results/build-scene-20261025T-rouge2
+claude plugin eval : exit 1
+ok : build-scene-render-request (négatif) : WITH 1.00, Δ —
+rouge : build-scene-resume : WITH 0.22, Δ —
+coût : 1,43 USD
+verdict : rouge
+exit 1
+```
+
+Premier vert, après le skill (deux bras, plafond 18 USD ; « oui » de Soon) : verdict rouge, 6,17 USD. `first-scene` 0,67 : une réponse sans l'annonce de la scène, quand l'écriture est refusée ; `resume` 0,83 : une réponse finit par « si tu valides, j'enchaîne sur Final ». Skill corrigé (l'annonce ouvre la réponse même sans écriture ; rien sur la scène suivante avant la réponse de Soon), `check-skill` conforme. Vert, relancé sur les cinq cas (plafond 10 USD, `--keep-temp` ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'build-scene-*' --no-publish --max-cost-usd 10 --keep-temp --scaffold --output-dir ./evals/results/build-scene-20261025T222919
+claude plugin eval : exit 0
+$ bash pp.sh eval-verdict … build-scene …/aggregate-result.json
+ok : build-scene-add-scene (négatif) : WITH 1.00, Δ +0.33
+ok : build-scene-first-scene (positif) : WITH 1.00, Δ +1.00
+ok : build-scene-fix-overflow (positif) : WITH 1.00, Δ +1.00
+ok : build-scene-render-request (négatif) : WITH 1.00, Δ +0.17
+ok : build-scene-resume (positif) : WITH 1.00, Δ +1.00
+coût : 6,72 USD
+verdict : vert
+exit 0
+```
+
+Sans le skill, le témoin trouve la cause du débordement, mais ne parle ni d'images clés, ni de planche, ni de relecture, ni de statut ; sur la reprise, il conteste les statuts du storyboard d'après le code et part sur `Final`. Coût total des évaluations de `build-scene` : 18,52 USD.
+
+Coût en contexte permanent (`claude plugin details`) : ~150 tokens pour `build-scene` (estimé ~100), ~582 pour le plugin ; ~2k à chaque appel.

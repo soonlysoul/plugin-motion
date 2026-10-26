@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "name": "build-scene-first-scene",
+  "description": "Demande de Soon, telle qu'il la tape (US-3, US-4), juste après le storyboard : trois scènes à faire, aucune codée.",
+  "tags": [
+    "build-scene",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill build-scene est invoqué ; il prend Ouverture, la première scène, avec ses 150 images, annonce les images clés qu'il rendra (dont 0 et 149, la dernière), la planche contact et sa relecture indépendante avant la validation par Soon, sans toucher à Message ni à Final.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Le plan me va, attaque la première scène.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?build-scene\""
+    },
+    {
+      "name": "last-frame",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "\\b149\\b"
+    },
+    {
+      "name": "scene-plan",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all four: (1) takes the scene Ouverture, the first of storyboard.md, and gives its duration of 150 frames (« images »); (2) lists by number the key frames it renders or will render, including frame 0 and frame 149, the last one; (3) says those frames are assembled into a contact sheet (« planche ») that an independent reviewer looks at before Soon validates the scene; (4) neither builds nor plans Message or Final. Saying it could not write the file in this session does not fail the case.\nFAIL if any of the four is missing, or if it treats the scene as validated.\n"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "name": "build-scene-fix-overflow",
+  "description": "Demande de Soon, telle qu'il la tape (US-3, US-4), sur une scène validée dont le titre sort du cadre : la cause est dans src/scenes/Final.tsx.",
+  "tags": [
+    "build-scene",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill build-scene est invoqué sur Final ; il trouve la cause (taille fixe de 200 px, sans retour à la ligne) dans src/scenes/Final.tsx, propose ou fait une correction qui tient dans le cadre, et repasse la scène en « construite » : images clés et planche rendues de nouveau, relues, puis validation par Soon.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Le titre de la scène 3 déborde à droite, corrige-le.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?build-scene\""
+    },
+    {
+      "name": "back-to-built",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "construite",
+      "flags": "i"
+    },
+    {
+      "name": "fix-and-review",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all three: (1) locates the cause in src/scenes/Final.tsx, namely the fixed font size of 200 px with whiteSpace nowrap; (2) proposes or makes a fix that keeps the title inside the 1920-pixel frame; (3) says the scene Final goes back to « construite »: its key frames and contact sheet are rendered again and reviewed before Soon validates it again. Saying it could not edit the file in this session does not fail the case.\nFAIL if any of the three is missing, if it declares the scene fixed and validated without a new render and review, or if it changes Ouverture or Message.\n"
+    }
+  ]
+}

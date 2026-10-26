@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "name": "build-scene-resume",
+  "description": "Demande de Soon, telle qu'il la tape (US-7), sur une vidéo interrompue : Ouverture validée, Message construite et relue sans défaut, Final à faire.",
+  "tags": [
+    "build-scene",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill build-scene est invoqué ; il lit les statuts, reprend à Message, construite, dont il ne reste que l'approbation de Soon : il présente out/preview/Message/planche.png et la relecture sans défaut, et attend la réponse de Soon sans reconstruire Message ni commencer Final.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "On reprend la vidéo là où on s'était arrêtés.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?build-scene\""
+    },
+    {
+      "name": "contact-sheet",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "out/preview/Message/planche\\.png"
+    },
+    {
+      "name": "awaits-approval",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all three: (1) gives the state of the three scenes: Ouverture validated, Message built (« construite »), Final to do; (2) says that Message only awaits Soon's approval of its contact sheet, points to out/preview/Message/planche.png and says its last review found no defect; (3) asks Soon to approve the contact sheet or name what to change, and stops there.\nFAIL if any of the three is missing, if it rewrites or rebuilds Message, if it starts or plans Final before Soon's answer, or if it marks Message as validated itself.\n"
+    }
+  ]
+}
