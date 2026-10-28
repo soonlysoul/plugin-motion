@@ -1,11 +1,11 @@
 # PROGRESS — plugin-motion
 
-Dernière mise à jour : 2026-10-26
+Dernière mise à jour : 2026-10-28
 Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Quatre composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1) et `build-scene` (US-3, US-4, US-7), avec `scripts/doctor.sh`, `scripts/preview.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). Prochaine étape : `render-video` et `probe.sh` par `/plugin-plugin:add` ; sa suite vérifie qu'il ne se déclenche pas avec le skill officiel `remotion-render`.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Cinq composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7) et `render-video` (US-6, US-7), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Restent : `sync-voiceover` (US-5, critère 5), l'enchaînement complet du critère 3 et les trois exécutions de `frame-reviewer` du critère 4.
 
 ## Composants
 
@@ -388,3 +388,161 @@ exit 0
 Sans le skill, le témoin trouve la cause du débordement, mais ne parle ni d'images clés, ni de planche, ni de relecture, ni de statut ; sur la reprise, il conteste les statuts du storyboard d'après le code et part sur `Final`. Coût total des évaluations de `build-scene` : 18,52 USD.
 
 Coût en contexte permanent (`claude plugin details`) : ~150 tokens pour `build-scene` (estimé ~100), ~582 pour le plugin ; ~2k à chaque appel.
+
+### Skill `render-video` — 2026-10-28
+
+Avec Bash (`npx remotion render`, `probe.sh`). Lit `storyboard.md` et annonce le format, le total en images et en secondes, la voix off prévue ou non, et le statut de chaque scène. Une scène qui n'est pas `validée` est nommée avec ce qu'elle implique (`à faire` ou sans fichier : absente de `Video`, MP4 incomplet ; `construite` : planche non approuvée) ; le skill propose de la finir par `/plugin-motion:build-scene` ou de rendre quand même, et s'arrête sans donner de commande. Vérifie la composition `Video` de `src/Root.tsx` (format du storyboard, durée égale au total, audio si voix off), rend `npx remotion render Video out/<nom>.mp4` (`<nom>` : celui de Soon, sinon le `name` de `package.json`, sinon le dossier), lance `probe.sh` et présente le verdict par contrôle, avec la cause probable de chaque écart ; ne corrige rien et ne change aucun statut. La description renvoie l'image fixe, la scène seule et l'export transparent au skill officiel `remotion-render` du projet.
+
+#### `probe.sh`, test d'abord
+
+Sorties `ffprobe -v error -print_format json -show_format -show_streams` enregistrées dans `tests/fixtures/probe/`, sur des MP4 encodés par ffmpeg 8.1.2 dans le scratchpad (`testsrc`, libx264 ; une sinusoïde AAC pour `voix`) : `conforme` (1920×1080, 30 i/s, 600 images), `voix` (le même avec une piste audio), `decale` (602 images), `cadence` (600 images à 30000/1001), `resolution` (1280×720). Le test en dérive trois : 601 images, sans `nb_frames`, sans piste vidéo.
+
+Rouge, avant le script :
+
+```
+$ bash tests/static/test_probe.sh
+  ÉCHEC  scripts/probe.sh présent
+         absent
+test_probe : 0 réussis, 1 échoués, 0 sautés
+exit 1
+```
+
+Vert, après :
+
+```
+$ bash tests/static/test_probe.sh
+  ok     scripts/probe.sh présent
+# conforme
+  ok     conforme : exit 0
+  ok     un verdict JSON sur stdout
+  ok     verdict : conforme
+  ok     durée : 600 images attendues, 600 lues, écart 0, tolérance 1
+  ok     cadence : 30 attendue, 30 lue
+  ok     largeur : 1920
+  ok     hauteur : 1080
+  ok     audio non exigé sans voix off
+  ok     ne lit que le premier bloc json
+  ok     nomme le MP4 lu, en chemin absolu
+  ok     ffprobe appelé une fois
+  ok     ffprobe en JSON, flux et format
+  ok     un MP4 relatif se lit depuis le projet
+  ok     un MP4 en chemin absolu : exit 0
+  ok     voix off et piste audio : exit 0
+  ok     audio exigé et présent
+  ok     une piste audio sans voix off reste conforme
+  ok     601 images : exit 0, à une image près
+  ok     601 images : écart 1, dans la tolérance
+  ok     sans nb_frames : exit 0
+  ok     sans nb_frames, la durée vient des secondes × cadence
+# durée décalée de 2 images
+  ok     602 images : exit 1
+  ok     verdict : non conforme
+  ok     durée : 602 lues, écart +2
+  ok     les autres contrôles restent conformes
+# mauvaise cadence
+  ok     29,97 i/s : exit 1
+  ok     cadence : 29.97 lue, écart -0.03
+  ok     la durée en images reste conforme
+# mauvaise résolution
+  ok     1280×720 : exit 1
+  ok     largeur et hauteur non conformes, avec leur écart
+# piste audio manquante avec voix off
+  ok     voix off sans piste audio : exit 1
+  ok     audio exigé, absent
+  ok     seul l'audio est en défaut
+# MP4 illisible
+  ok     refuse un MP4 absent (exit 2)
+  ok     ffprobe n'est pas lancé sur un MP4 absent
+  ok     refuse un fichier que ffprobe ne lit pas (exit 2)
+  ok     refuse un fichier sans piste vidéo (exit 2)
+  ok     refuse sans ffprobe, renvoie à doctor.sh (exit 2)
+# storyboard illisible
+  ok     refuse un projet sans storyboard.md
+  ok     refuse un storyboard sans bloc json
+  ok     refuse un bloc json illisible
+  ok     refuse un storyboard sans format
+  ok     refuse une cadence qui n'est pas un nombre entier
+  ok     refuse un voiceover qui n'est pas true ou false
+  ok     refuse un storyboard sans scène
+  ok     refuse une scène sans durée entière, et la nomme
+  ok     ffprobe n'est pas lancé sur un storyboard illisible
+  ok     refuse un appel sans MP4
+  ok     refuse un appel sans projet
+test_probe : 50 réussis, 0 échoués, 0 sautés
+exit 0
+```
+
+Le verdict est un objet JSON : `verdict` (`conforme` ou `non conforme`), `mp4`, puis `durationInFrames` (attendu : la somme des scènes ; lu : `nb_frames` de la piste vidéo, ou ses secondes × sa cadence ; tolérance 1), `fps`, `width`, `height`, chacun avec `expected`, `actual`, `gap` et `ok`, et `audio` (`required` : `voiceover` ; `present` ; `ok`). Une piste audio sans voix off reste conforme. Un MP4 absent, que ffprobe ne lit pas ou sans piste vidéo est refusé (exit 2), comme un storyboard sans bloc json, illisible, sans format, à cadence non entière, à `voiceover` autre que `true` ou `false`, sans scène ou dont une scène n'a pas de durée entière. Quatre mutations du script, chacune prise par le test : tolérance portée à 2 images, contrôle audio neutralisé, lecture au-delà du premier bloc json, cadence arrondie à l'entier. `shellcheck -S warning` : rien sur `probe.sh` ; sur le test, le seul SC2034 de `SUITE`.
+
+#### Essai réel
+
+Projet de trois scènes dans le scratchpad (`Ouverture` 45, `Message` 60, `Final` 45 : 150 images, 1920×1080 à 30 i/s), `src/` écrit à la main, `node_modules` lié à celui du projet d'essai du 2026-10-24 (Remotion 4.0.538), cache npm dans le scratchpad, sans réseau :
+
+```
+$ npx remotion render Video out/essai-rendu.mp4
+Encoded 150/150
++                    out/essai-rendu.mp4 76.6 kB
+real	0m7,876s
+exit 0
+$ bash scripts/probe.sh …/scratchpad/essai-rendu out/essai-rendu.mp4 | jq -c '{verdict, durationInFrames, fps, width, height, audio}'
+{"verdict":"conforme","durationInFrames":{"expected":150,"actual":150,"gap":0,"tolerance":1,"ok":true},"fps":{"expected":30,"actual":30,"gap":0,"ok":true},"width":{"expected":1920,"actual":1920,"gap":0,"ok":true},"height":{"expected":1080,"actual":1080,"gap":0,"ok":true},"audio":{"required":false,"present":false,"ok":true}}
+exit 0
+```
+
+Sans audio dans la composition, Remotion n'écrit aucune piste audio (une seule piste, h264, `nb_frames` 150) : le contrôle de la voix off a donc un sens. Le même MP4 avec `"voiceover": true` : `non conforme`, `audio` `{"required":true,"present":false,"ok":false}`, exit 1. Avec un `<Audio src={staticFile("voix.wav")} />` (sinusoïde de 5 s) dans `Video`, rendu en 8,1 s : `conforme`, `audio` `{"required":true,"present":true,"ok":true}`, exit 0.
+
+#### Suite d'évaluation
+
+`evals/render-video/` : deux cas positifs (« Toutes les scènes sont validées, sors-moi le MP4 final. » ; « Lance le rendu final de la vidéo. » avec `Message` construite et `Final` à faire, sans fichier), deux négatifs, du ressort de `remotion-render` (« Exporte la scène Ouverture seule en WebM transparent… » ; « Rends l'image 120 de la scène Message en PNG… »). Trois exécutions, outils en lecture seule, sans Bash : les projets de test n'ont pas `node_modules`. `setup.sh` tirés d'un même générateur, autonomes ; la composition `Video` y enchaîne les scènes qui ont leur fichier. Lancement hors de `pp.sh eval-run`, `--scaffold` ajouté, verdict par `pp.sh eval-verdict`.
+
+**Concurrence avec `remotion-render`.** `claude plugin eval` lance chaque session avec `--setting-sources user` (constaté dans la CLI 2.1.296) : un skill posé dans `.claude/skills/` du projet, là où `npx remotion skills add` le lie, n'y est pas chargé. Constaté sans coût, clé factice et API sur `127.0.0.1:9` : sous `--setting-sources user`, seul `$CLAUDE_CONFIG_DIR/skills/` est lu ; sous `user,project`, `.claude/skills/` aussi. Chaque `setup.sh` pose donc un remplaçant de `remotion-render`, même nom et même description (« Export a Remotion video »), corps réécrit (pas de licence trouvée pour `remotion-dev/skills`), dans `$HOME/../config/skills/`, le dossier de configuration de la session ; il sort en 1 si `$HOME/../config/.claude.json` manque, plutôt que de tourner sans concurrent. Vérifié dans les traces gardées : `remotion-render` est chargé dans chacune des 42 sessions ; au vert, dans le bras avec le plugin, les cas positifs invoquent `plugin-motion:render-video` et jamais `remotion-render`, les négatifs `remotion-render` et jamais `render-video`. Les sessions coûtent ici 0,09 à 0,47 USD (0,21 en moyenne au rouge).
+
+Rouge, avant le skill (un bras, plafond 6 USD pour 12 sessions à 0,40 USD, `--keep-temp` pour lire les skills chargés ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'render-video-*' --no-publish --max-cost-usd 6 --ablation none --keep-temp --scaffold --output-dir ./evals/results/render-video-20261026T124339
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . render-video …/aggregate-result.json
+rouge : render-video-final : WITH 0.00, Δ —
+rouge : render-video-not-validated : WITH 0.33, Δ —
+ok : render-video-still (négatif) : WITH 1.00, Δ —
+ok : render-video-transparent (négatif) : WITH 1.00, Δ —
+coût : 2,52 USD
+verdict : rouge
+exit 1
+```
+
+Sans le skill, sur le MP4 final, le modèle invoque `remotion-render`, rend vers `out/notio.mp4` et ne contrôle rien au storyboard. Sur les scènes non validées, il les signale bien, mais propose un rendu provisoire, souvent avec sa commande : le correcteur `asks-first` en passait 2 sur 3. Resserré après le rouge, avant le skill : il exige `/plugin-motion:build-scene` et aucune commande de rendu ; les trois réponses rouges y échouent, et le verdict rouge du cas tient de toute façon par `skill-fired`, inchangé, à 0 appel sur 3.
+
+Vert, après le skill (`check-skill` : conforme ; deux bras, plafond 12 USD pour 24 sessions, `--keep-temp` ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'render-video-*' --no-publish --max-cost-usd 12 --keep-temp --scaffold --output-dir ./evals/results/render-video-20261026T125709
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . render-video …/aggregate-result.json
+ok : render-video-final (positif) : WITH 1.00, Δ +1.00
+ok : render-video-not-validated (positif) : WITH 1.00, Δ +1.00
+ok : render-video-still (négatif) : WITH 1.00, Δ +0.00
+rouge : render-video-transparent : WITH 0.83, Δ +0.00
+coût : 4,94 USD
+verdict : rouge
+exit 1
+```
+
+`render-video` ne s'est déclenché dans aucun négatif. Les deux refus de `transparent-export`, un par bras, portaient sur des réponses justes (VP9 en `yuva420p`, fond opaque à retirer, ProRes 4444 en repli), presque identiques à celles acceptées : la clause FAIL « announces a check of the video against the storyboard » prenait la vérification du WebM exporté (150 images, 1920×1080) pour le contrôle de la vidéo finale. Clause précisée (échoue : rendre `Video` entière ou un MP4 final, proposer `probe.sh`), skill inchangé ; relance du seul cas (6 sessions, plafond 3 USD ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'render-video-transparent' --no-publish --max-cost-usd 3 --keep-temp --scaffold --output-dir ./evals/results/render-video-transparent-20261028T110637
+claude plugin eval : exit 0
+$ bash pp.sh eval-verdict . render-video …/aggregate-result.json
+ok : render-video-transparent (négatif) : WITH 1.00, Δ +0.00
+coût : 1,29 USD
+verdict : vert
+exit 0
+```
+
+Le vert se compose de ces deux passages : les trois premiers cas du premier, le cas transparent du second. Le cas `still` garde une clause FAIL de même forme ; elle a passé 6 sur 6. Sans le skill, sur le MP4 final, le témoin rend vers `out/notio.mp4` sans annoncer de contrôle au storyboard ; sur les scènes non validées, il propose un rendu partiel avec sa commande. Coût total des évaluations de `render-video` : 8,75 USD.
+
+Coût en contexte permanent (`claude plugin details`) : ~150 tokens pour `render-video` (estimé ~100), ~730 pour le plugin ; ~1,5k à chaque appel.
+
+Reste à faire pour le critère 3 : l'enchaînement complet sur un brief de 3 scènes, de `new-video` à `render-video`, sans que Soon touche au code ; `probe.sh` y est déjà constaté sur un vrai rendu de Remotion (essai réel ci-dessus).

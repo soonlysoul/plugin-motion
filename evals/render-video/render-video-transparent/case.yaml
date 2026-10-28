@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "name": "render-video-transparent",
+  "description": "Demande voisine, du ressort du skill officiel remotion-render, chargé dans la session : exporter une scène seule en vidéo transparente n'est pas rendre la vidéo finale.",
+  "tags": [
+    "render-video",
+    "negative",
+    "remotion-render"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill render-video n'est pas invoqué ; la réponse traite de l'export de la seule composition Ouverture avec un canal alpha, sans rendre la vidéo finale ni la contrôler au storyboard.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Exporte la scène Ouverture seule en WebM transparent, pour l'incruster dans un montage.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-not-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?render-video\"",
+      "min": 0,
+      "max": 0,
+      "arm": "both"
+    },
+    {
+      "name": "transparent-export",
+      "type": "llm",
+      "criteria": "PASS if the final reply deals with exporting only the composition Ouverture as a transparent video: a WebM (VP8 or VP9) or ProRes 4444 export with an alpha pixel format (such as yuva420p), or the remark that the scene paints an opaque background that must go for the transparency to show. Checking the exported file itself (its alpha channel, its size, its 150 frames) is part of a good answer.\nFAIL if it renders, or gives the command that renders, the composition Video (all the scenes) or a final MP4 of the whole video, or if it proposes to check the whole video against storyboard.md with probe.sh.\n"
+    }
+  ]
+}

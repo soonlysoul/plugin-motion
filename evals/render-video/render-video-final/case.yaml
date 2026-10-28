@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "name": "render-video-final",
+  "description": "Demande de Soon, telle qu'il la tape (US-6), dans un projet prêt où le skill officiel remotion-render (« Export a Remotion video ») est chargé lui aussi : les deux sont en concurrence, render-video doit l'emporter.",
+  "tags": [
+    "render-video",
+    "positive",
+    "remotion-render"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill render-video est invoqué ; il annonce les trois scènes validées, donne le rendu de la composition Video vers out/notio-promo.mp4, puis le contrôle du MP4 par probe.sh avec les valeurs du storyboard : 600 images (20 s) à une image près, 30 i/s, 1920×1080.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Toutes les scènes sont validées, sors-moi le MP4 final.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?render-video\""
+    },
+    {
+      "name": "output-file",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "out/notio-promo\\.mp4"
+    },
+    {
+      "name": "render-then-check",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all three: (1) says that the three scenes Ouverture, Message and Final are validated; (2) gives the render of the composition Video to out/notio-promo.mp4 (npx remotion render Video out/notio-promo.mp4), run or still to run; (3) says that the rendered MP4 is then checked against the storyboard, with the expected values: 600 frames (20 s) to within one frame, 30 fps, 1920×1080.\nFAIL if any of the three is missing, or if it rebuilds, re-renders the key frames of or re-reviews a scene.\n"
+    }
+  ]
+}

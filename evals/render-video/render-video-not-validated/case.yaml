@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "name": "render-video-not-validated",
+  "description": "Demande de Soon (US-6, US-7) sur une vidéo inachevée : Ouverture validée, Message construite, Final à faire et sans fichier ; remotion-render est chargé lui aussi.",
+  "tags": [
+    "render-video",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill render-video est invoqué ; il lit les statuts, nomme Message (construite) et Final (à faire), dit que Final manquerait au rendu, propose de les finir par /plugin-motion:build-scene ou de rendre quand même, et attend la réponse de Soon sans donner de commande de rendu.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Lance le rendu final de la vidéo.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?render-video\""
+    },
+    {
+      "name": "asks-first",
+      "type": "llm",
+      "criteria": "PASS if the final reply does all three: (1) names Message as built but not validated (« construite ») and Final as still to do (« à faire »); (2) says that a render now would leave Final out of the video, or give an incomplete video; (3) proposes to finish these scenes first with /plugin-motion:build-scene, or to render anyway, and stops there to wait for Soon's answer, without giving any render command.\nFAIL if a scene or its status is missing or wrong, if it presents the render as done or launched, if it does not name /plugin-motion:build-scene, or if it gives a render command (npx remotion render …), even as an option.\n"
+    }
+  ]
+}
