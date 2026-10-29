@@ -1,11 +1,11 @@
 # PROGRESS — plugin-motion
 
-Dernière mise à jour : 2026-10-28
+Dernière mise à jour : 2026-10-29
 Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Cinq composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7) et `render-video` (US-6, US-7), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Restent : `sync-voiceover` (US-5, critère 5), l'enchaînement complet du critère 3 et les trois exécutions de `frame-reviewer` du critère 4.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Reste l'enchaînement complet du critère 3.
 
 ## Composants
 
@@ -46,7 +46,29 @@ exit 0
 
 Coût en contexte permanent (`claude plugin details`) : ~193 tokens pour le plugin, dont ~190 pour `frame-reviewer` (estimé ~80 dans l'architecture) ; ~1,4k à chaque appel.
 
-Reste à faire pour le critère 4 : trois exécutions sur une planche de test où un texte déborde volontairement (`tests/fixtures/`).
+#### Critère 4, constaté le 2026-10-29
+
+Planche de test `tests/fixtures/frame-reviewer/` : un `storyboard.md` d'une scène, `Promesse` (1920×1080 à 30 i/s, 90 images ; titre « Toutes vos idées au même endroit » sur une ligne, sous-titre dessous ; fondu, puis fixe jusqu'à la fin), et ses images clés `f0000`, `f0015`, `f0025`, `f0045`, `f0089` avec `planche.png`, rendues par `preview.sh` sur Remotion 4.0.538. Ce sont les images que choisit `build-scene` : la première, la dernière, celle du milieu, la fin de l'entrée du titre (15) et celle du sous-titre (25). Le titre, aligné à gauche à 192 px, en 132 px sans retour à la ligne, sort par le bord droit : on lit « …au même endr », avec le « o » coupé, de l'image 15 à la fin. Sur la planche réduite, la coupure reste discrète. Le code de la scène n'est pas dans la fixture : l'agent ne doit pas le lire.
+
+Chaque exécution copie la fixture dans un dossier au nom neutre, `video-notio/`, puis ouvre une session headless qui lance l'agent comme l'étape 5 de `build-scene`, avec seulement le dossier, le storyboard et l'identifiant :
+
+```
+$ claude -p --plugin-dir <plugin-motion> --model sonnet --output-format stream-json --verbose \
+    --max-budget-usd 1 --no-session-persistence \
+    "Lance l'agent plugin-motion:frame-reviewer avec exactement ces trois éléments, et rien d'autre : le dossier <copie>/out/preview/Promesse/, le chemin <copie>/storyboard.md, l'identifiant Promesse. Rends ensuite son rapport tel quel."
+```
+
+Critère de réussite, fixé avant le lancement et vérifié par `grep` sur le rapport brut de l'agent (le résultat de l'outil Agent, pas ce que la session en relaie) : `STATUS: done`, et une ligne `| débordement | bloquant |` sur `f0015`, `f0025`, `f0045` ou `f0089` qui cite « endr ».
+
+| Exécution | Débordement signalé | Zone donnée | Autres défauts | STATUS | Coût |
+| --- | --- | --- | --- | --- | --- |
+| 1 | bloquant, `f0015` à `f0089` sur une ligne, « Toutes vos idées au même endr » | « haut droite à droite » | marge de sécurité, bloquant | done | 0,26 USD |
+| 2 | bloquant, `f0015` à `f0089` sur une ligne, « il manque "oit" » | « haut droite à droite » | écart au storyboard (« endroit » jamais entier), bloquant | done | 0,27 USD |
+| 3 | bloquant, une ligne par image (4), « le "r" est lui-même tronqué » | « centre, droite » | marge de sécurité, bloquant ; contraste, mineur, du sous-titre en fondu à `f0015` | done | 0,27 USD |
+
+**Critère 4 tenu** : 3 exécutions sur 3, 0,79 USD au total, sessions comprises ; pas de passage à `opus`. Dans les trois, l'agent tourne sur `claude-sonnet-5-5` et ne lit que `storyboard.md`, `planche.png` et les cinq images clés.
+
+Écarts au format de sortie, sans effet sur le critère : les exécutions 1 et 2 regroupent quatre images sur une seule ligne, alors que le format en demande une par ligne ; aucune ne donne une zone unique de la grille (attendue : `droite`) ; les trois ajoutent un paragraphe des points conformes entre le bloc et le rapport ; les exécutions 1 et 2 posent sous `OPEN_QUESTIONS` une question sur le fondu du titre entre les images 0 et 15, qu'aucune image clé ne montre.
 
 ### Skill `storyboard` — 2026-10-24
 
@@ -547,7 +569,7 @@ Coût en contexte permanent (`claude plugin details`) : ~150 tokens pour `render
 
 Reste à faire pour le critère 3 : l'enchaînement complet sur un brief de 3 scènes, de `new-video` à `render-video`, sans que Soon touche au code ; `probe.sh` y est déjà constaté sur un vrai rendu de Remotion (essai réel ci-dessus).
 
-### Skill `sync-voiceover` — en cours, 2026-10-28
+### Skill `sync-voiceover` — 2026-10-28
 
 Avec Bash (ffmpeg, `whisper-cli`, `preview.sh`). Proposé à Soon et accepté avant toute écriture : deux scripts testés, que l'architecture ne prévoyait pas, pour la partie déterministe — `transcribe.sh` (ffmpeg en WAV 16 kHz mono, `whisper-cli`, `public/voiceover.json`) et `cues.sh` (repères en images) ; `templates/timing-voiceover.ts`, que le skill pose en `src/timing.ts` à la première synchronisation.
 
