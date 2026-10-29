@@ -25,7 +25,7 @@ new-video      : dossier → create-video --blank → remotion skills add → te
 storyboard     : brief → storyboard.md (format, scènes « à faire ») → accord de Soon
 build-scene    : storyboard.md → scène suivante → src/scenes/<Scene>.tsx + composition
                → preview.sh → frame-reviewer → corrections → « construite » → validation → « validée »
-sync-voiceover : fichier audio → Whisper → public/voiceover.json → repères des scènes en images → preview.sh
+sync-voiceover : fichier audio → transcribe.sh (Whisper) → public/voiceover.json → cues.sh (repères en images) → preview.sh
 render-video   : scènes « validées » → remotion render → probe.sh → rapport
 ```
 
@@ -41,8 +41,8 @@ Un dossier par vidéo, à l'emplacement tranché dans le PRD :
 | `src/theme.ts` | `new-video` (modèle), `storyboard` | Couleurs, polices, courbes d'accélération, durées types. Les scènes n'écrivent aucune couleur ni police en dur. |
 | `src/scenes/<Scene>.tsx` | `build-scene` | Une composition par scène |
 | `src/Root.tsx` | `build-scene` | Une `Composition` par scène, plus la composition complète `Video`, qui enchaîne les scènes |
-| `src/timing.ts` | `new-video` (modèle) | Conversion des millisecondes en numéro d'image (`Math.round(ms * fps / 1000)`), accès aux mots de `voiceover.json` |
-| `public/voiceover.json` | `sync-voiceover` | Les mots de la voix off avec leur début et leur fin en millisecondes |
+| `src/timing.ts` | `new-video` (modèle), `sync-voiceover` | Conversion des millisecondes en numéro d'image (`Math.round(ms * fps / 1000)`) ; à la première synchronisation, `templates/timing-voiceover.ts` le remplace et y ajoute l'accès aux mots de `voiceover.json` et `cueFrame(scene, n)`, l'image d'un repère depuis le début de sa scène |
+| `public/voiceover.json` | `transcribe.sh`, `cues.sh` | Les mots de la voix off avec leur début et leur fin en millisecondes (type `Caption` de Remotion, avec leur confiance), les segments de parole, et les repères de chaque scène en images |
 | `out/preview/<Scene>/` | `preview.sh`, `build-scene` | Images clés `f<NNNN>.png`, `planche.png`, et `review.md`, le dernier rapport de `frame-reviewer` |
 | `out/<nom>.mp4` | `render-video` | Le rendu final |
 
@@ -63,6 +63,8 @@ Chaque composant répond à une user story ; aucun n'existe « au cas où ».
 | `doctor.sh` | script | US-1 | Déterministe : présence et versions des outils, essai de rendu | 0 |
 | `preview.sh` | script | US-4 | Déterministe : rendre des images données et les assembler | 0 |
 | `probe.sh` | script | US-6 | Déterministe : comparer les métadonnées du MP4 au storyboard | 0 |
+| `transcribe.sh` | script | US-5 | Déterministe : convertir, transcrire, recaler les débuts de mots sur la parole | 0 |
+| `cues.sh` | script | US-5 | Déterministe : associer les repères aux mots, millisecondes en images | 0 |
 
 Total estimé : ~580 tokens.
 
@@ -75,7 +77,7 @@ Invocation des skills : déclenchement automatique par leur description, et touj
 | `new-video` | `npx create-video --yes --blank`, `npx remotion skills add`, `templates/`, `doctor.sh` | refuse un dossier non vide ; sur un échec de `doctor.sh`, s'arrête avec la correction à appliquer, sans rien modifier du système |
 | `storyboard` | — | après l'accord de Soon sur `storyboard.md` ; aucun code écrit |
 | `build-scene` | `preview.sh`, l'agent `frame-reviewer` | après une scène, passée en `validée` ou rendue à Soon avec ses défauts restants |
-| `sync-voiceover` | ffmpeg, `whisper-cpp`, `preview.sh` | après le recalage, scènes touchées repassées en `construite` |
+| `sync-voiceover` | `transcribe.sh` (ffmpeg, `whisper-cpp`), `cues.sh`, `preview.sh` | après le recalage, scènes touchées repassées en `construite` |
 | `render-video` | `npx remotion render`, `probe.sh` | après le rapport de `probe.sh` |
 
 `new-video` :
@@ -101,9 +103,8 @@ Invocation des skills : déclenchement automatique par leur description, et touj
 
 `sync-voiceover` :
 
-- prend un fichier audio de `public/` et le convertit avec ffmpeg en WAV 16 kHz mono, le format qu'attend whisper.cpp ;
-- le transcrit avec la ligne de commande de `whisper-cpp` (paquet nixpkgs, installé via plugin-nixos), avec les temps mot par mot en sortie JSON, et écrit les mots et leurs temps dans `public/voiceover.json`. Le nom exact du binaire (`whisper-cli` dans les versions récentes) et ses options se constatent à la création. Le fichier de modèle ggml se télécharge une fois, dans le cache de l'utilisateur ; sa taille se fixe à la création ;
-- associe chaque repère du storyboard au mot visé ; les scènes lisent leurs repères par `src/timing.ts`, jamais par des numéros d'image en dur ;
+- prend un fichier audio de `public/` et le fait transcrire par `transcribe.sh` : ffmpeg le convertit en WAV 16 kHz mono, le format qu'attend whisper.cpp ; `whisper-cli` (paquet nixpkgs `whisper-cpp`, installé via plugin-nixos) le transcrit mot par mot, et la détection vocale de whisper.cpp en donne les segments de parole ; un mot dans lequel s'ouvre un segment commence à ce début de segment. Modèles téléchargés une fois, avec l'accord de Soon, dans `~/.cache/plugin-motion/` : `ggml-large-v3-turbo-q5_0.bin` (574 Mo) et `ggml-silero-v6.2.0.bin` (885 Ko) ;
+- associe chaque repère du storyboard au mot visé par `cues.sh`, qui en donne l'image et dit si le mot ouvre un segment de parole ; quand Whisper a mal entendu, le skill choisit le mot (`wordIndex`) ; les scènes lisent leurs repères par `src/timing.ts`, jamais par des numéros d'image en dur ;
 - allonge une scène si la voix off la dépasse, puis repasse en `construite` chaque scène touchée et relance `preview.sh` sur ses repères.
 
 `render-video` :
@@ -127,13 +128,15 @@ Aucun en v1. Les vérifications déterministes sont des scripts appelés par les
 
 ## Scripts
 
-`#!/usr/bin/env bash`, bash et jq. Les binaires sont remplaçables pour les tests : `MOTION_NPX`, `MOTION_NODE`, `MOTION_FFMPEG`, `MOTION_FFPROBE`. Code de sortie non nul et message clair à chaque refus.
+`#!/usr/bin/env bash`, bash et jq. Les binaires sont remplaçables pour les tests : `MOTION_NPX`, `MOTION_NODE`, `MOTION_FFMPEG`, `MOTION_FFPROBE`, `MOTION_WHISPER`, `MOTION_WHISPER_VAD`. Code de sortie non nul et message clair à chaque refus.
 
 | Script | Rôle |
 | --- | --- |
 | `doctor.sh <projet>` | Une ligne par contrôle (`ok`, `manque`, `avertissement`), avec sa correction : Node à la version que demande Remotion ; ffmpeg et ffprobe ; versions identiques de `remotion` et de tous les `@remotion/*` de `package.json` ; essai de rendu d'une image. Si l'essai échoue, nomme la bibliothèque manquante quand l'erreur la donne et propose le plan B du PRD. `whisper-cpp` absent donne un avertissement, pas un échec, avec l'installation à demander à plugin-nixos. Sortie 0 si tous les contrôles obligatoires passent, 1 sinon. |
 | `preview.sh <projet> <Scene> <image>…` | Refuse une scène inconnue et une image hors de la durée de la scène ; rend chaque image demandée en `out/preview/<Scene>/f<NNNN>.png` avec la CLI Remotion, puis assemble `planche.png` avec le filtre ffmpeg `tile`, chaque image étiquetée de son numéro sous l'image. Affiche les chemins produits. Un bundle du projet, puis un seul rendu de la liste d'images en séquence PNG (mesure ci-dessous). |
 | `probe.sh <projet> <mp4>` | Lit le format et les scènes de `storyboard.md`, lit le MP4 avec `ffprobe -print_format json`, compare la durée (à une image près), la cadence, la largeur et la hauteur, et la piste audio si une voix off est prévue. Verdict JSON (`conforme`, et l'écart de chaque contrôle) ; sortie 0 si conforme, 1 sinon. |
+| `transcribe.sh <projet> <audio> [langue]` | Refuse un fichier hors de `public/`, un binaire ou un modèle absent (avec la commande qui le télécharge, sans la lancer). ffmpeg en WAV 16 kHz mono hors du projet ; `whisper-cli --vad -ml 1 -sow -ojf` ; `whisper-vad-speech-segments -vp 0` ; recale chaque mot sur le segment de parole qui s'ouvre dans son intervalle. Écrit `public/voiceover.json` (mots au type `Caption`, segments, repères vides) et un résumé JSON ; sortie 0, 1 si aucune parole, 2 sur un refus. |
+| `cues.sh <projet>` | Associe dans l'ordre chaque repère au premier mot égal qui suit le précédent (casse et ponctuation à part), ou au `wordIndex` posé par le skill ; image dans la vidéo `round(startMs × fps / 1000)`, image dans la scène, dans la scène ou non, début de segment de parole ou non ; fin de la voix face au total. Rapport JSON ; sortie 0 et repères écrits dans `voiceover.json` quand tout est calé, 1 sans rien écrire sinon, 2 sur un refus. |
 
 ## Tests et évaluations
 
@@ -141,6 +144,7 @@ Aucun en v1. Les vérifications déterministes sont des scripts appelés par les
   - `doctor.sh` avec binaires simulés : tout présent, versions Remotion désalignées, ffmpeg absent, essai de rendu en échec avec une bibliothèque nommée, Whisper absent (critère 2) ;
   - `preview.sh` avec binaires simulés : scène inconnue, image hors durée, commandes de rendu et d'assemblage attendues ;
   - `probe.sh` sur des sorties `ffprobe` enregistrées : conforme, durée décalée de 2 images, mauvaise cadence, mauvaise résolution, piste audio manquante (critère 3) ;
+  - `transcribe.sh` avec ffmpeg, whisper et la détection vocale simulés, sur leurs sorties enregistrées pour un extrait réel et pour un silence ; `cues.sh` sur des transcriptions de test : repère hors de sa scène, mot mal entendu, mot dit deux fois, voix plus longue que la vidéo (critère 5) ;
   - en-tête de `frame-reviewer` : exactement `Read, Glob` ;
   - lecture des données de `storyboard.md` par les scripts, sur des storyboards de test valides et invalides.
 - Une suite d'évaluation par skill (`evals/<skill>/`) : au moins un cas qui doit le déclencher, un qui ne le doit pas, trois exécutions par cas (critère 6).
@@ -170,3 +174,6 @@ Aucun en v1. Les vérifications déterministes sont des scripts appelés par les
 - `frame-reviewer` sur `sonnet`, `opus` si le critère 4 échoue : jusqu'à 3 passages par scène, à ménager sur le quota — 2026-10-23.
 - `whisper-cpp` de nixpkgs plutôt que `@remotion/install-whisper-cpp` ou Whisper en Python : construit pour NixOS, sans compilation par projet ni PyTorch — 2026-10-23.
 - `preview.sh` rend la liste des images clés en un seul `remotion render --sequence --frames=<liste>` depuis un bundle : 1,8 s pour 6 images d'une scène de 240, contre 10,4 s image par image et 8,6 s pour la séquence entière ; le coût suit le nombre d'images, pas la longueur de la scène — 2026-10-25.
+- La partie déterministe de `sync-voiceover` en deux scripts testés, `transcribe.sh` et `cues.sh`, et `cueFrame` dans `templates/timing-voiceover.ts`, posé à la première synchronisation : un `timing.ts` qui importerait `public/voiceover.json` ferait échouer le bundle de tout projet sans voix off (constaté sur Remotion 4.0.538) — 2026-10-28.
+- Débuts de mots recalés sur la détection vocale de whisper.cpp : sur un extrait de Soon, Whisper seul place un mot dit après une pause jusqu'à 1,1 s trop tôt, son DTW 90 à 250 ms trop tard ; les segments de parole tombent à ±10 ms des débuts mesurés sans Whisper. Un repère en milieu de phrase reste approché, et signalé — 2026-10-28.
+- Modèle `ggml-large-v3-turbo-q5_0` (574 Mo) : multilingue, à peu près la taille de `small`, et « Notio » bien transcrit — 2026-10-28.

@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0",
+  "name": "sync-voiceover-recorded",
+  "description": "Demande de Soon (US-5), telle qu'il la tape, dans un projet dont les trois scènes sont validées et portent leurs repères de voix off, la voix tout juste enregistrée dans public/voix.wav ; le skill officiel remotion-captions (« Transcribing, displaying and animating captions ») est chargé lui aussi : les deux sont en concurrence, sync-voiceover doit l'emporter.",
+  "tags": [
+    "sync-voiceover",
+    "positive",
+    "remotion-captions"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill sync-voiceover est invoqué ; il annonce les repères mot par mot, scène par scène, puis la transcription de public/voix.wav par whisper.cpp dans public/voiceover.json et le calcul de l'image de chaque repère depuis le début de sa scène, lue par src/timing.ts ; les scènes à repères repassent en construite, leurs images aux repères sont rendues de nouveau.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "J'ai enregistré la voix off dans public/voix.wav, cale les animations dessus.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?sync-voiceover\""
+    },
+    {
+      "name": "voiceover-json",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "public/voiceover\\.json"
+    },
+    {
+      "name": "whisper-cli",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "whisper-cli"
+    },
+    {
+      "name": "timing-ts",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "timing\\.ts"
+    },
+    {
+      "name": "construite",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "construite"
+    },
+    {
+      "name": "cues-named",
+      "type": "llm",
+      "criteria": "PASS if the final reply names the voiceover cues of the storyboard with their target words and their scenes: vite (Ouverture), Notez and retrouvez (Message), Notio and Disponible (Final).\nFAIL if one of these five words, or the scene it belongs to, is missing.\n"
+    },
+    {
+      "name": "frame-from-word",
+      "type": "llm",
+      "criteria": "PASS if the final reply says that the frame of each cue comes from the start time of its word, converted to frames at 30 fps, and is counted from the start of its scene.\nFAIL if it does not say where the frame comes from, or counts it from the start of the video.\n"
+    },
+    {
+      "name": "scenes-back",
+      "type": "llm",
+      "criteria": "PASS if the final reply says that the scenes whose cues are set go back to « construite », and that their key frames are rendered again at the cue frames.\nFAIL if it keeps them « validée », or does not say that their key frames are rendered again.\n"
+    },
+    {
+      "name": "whisper-only",
+      "type": "llm",
+      "criteria": "PASS if the final reply transcribes public/voix.wav word by word, locally, with whisper.cpp, run or given as a command still to run.\nFAIL if it transcribes with @remotion/whisper-webgpu or with any engine other than whisper.cpp, if it adds captions or subtitles shown on screen, or if it presents the transcription as done when nothing was run.\n"
+    }
+  ]
+}

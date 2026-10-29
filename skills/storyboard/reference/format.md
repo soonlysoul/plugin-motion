@@ -31,7 +31,7 @@
 | `durationInFrames` | Whole number above 0: seconds × fps, rounded. The sum over the scenes is the total of the video. |
 | `text` | What appears on screen, word for word, lines separated by `\n`; `""` for a scene without text. |
 | `motion` | The intent of the motion in words: what enters, from where, how, and on what rhythm. Never code. |
-| `cues` | `[]` without a voiceover. With one: `{ "word": "<mot visé>", "action": "<ce qui tombe dessus>" }` per cue; sync-voiceover adds the frame. |
+| `cues` | `[]` without a voiceover. With one: `{ "word": "<mot visé>", "action": "<ce qui tombe dessus>" }` per cue, in the order they are said. sync-voiceover adds `frame`, the cue's frame from the start of its scene, and `wordIndex`, the transcribed word it chose, when Whisper misheard the word. |
 | `status` | `à faire`, `construite` or `validée`, exactly. The storyboard skill writes only `à faire`. |
 
 ## The free text

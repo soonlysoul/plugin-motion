@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "name": "sync-voiceover-overflow",
+  "description": "Demande de Soon (US-5, US-7) après un second enregistrement, plus lent : la transcription de public/voiceover.json finit à 21,4 s, image 642, après les 600 images de la vidéo ; remotion-captions est chargé lui aussi.",
+  "tags": [
+    "sync-voiceover",
+    "positive"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill sync-voiceover est invoqué ; il lit la fin de la voix (21,4 s, image 642), la compare aux 600 images, allonge la seule scène Final à au moins 252 images, la repasse en construite et recalcule ses repères depuis public/voiceover.json.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "La voix off dépasse la fin de la vidéo, recale tout.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?sync-voiceover\""
+    },
+    {
+      "name": "voice-end-frame",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "642"
+    },
+    {
+      "name": "cues-script",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "cues\\.sh"
+    },
+    {
+      "name": "final-construite",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "Final[^\\n]*construite"
+    },
+    {
+      "name": "total-650",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "\\b650\\b"
+    },
+    {
+      "name": "others-unchanged",
+      "type": "llm",
+      "criteria": "PASS if the final reply keeps Ouverture at 150 frames and Message at 240, including when it does not mention them.\nFAIL only if it changes the duration of Ouverture or Message.\n"
+    },
+    {
+      "name": "audio-intact",
+      "type": "llm",
+      "criteria": "PASS if the final reply keeps the voiceover whole, including when it does not mention it.\nFAIL only if it cuts, speeds up or trims the audio.\n"
+    },
+    {
+      "name": "others-validated",
+      "type": "llm",
+      "criteria": "PASS if the final reply leaves the scenes Ouverture and Message « validée », including when it does not mention their status: their cue frames 59, 18 and 72 do not change.\nFAIL only if it sets Ouverture or Message back to « construite », or sends one of them back to review.\n"
+    }
+  ]
+}

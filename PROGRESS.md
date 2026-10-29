@@ -546,3 +546,270 @@ Le vert se compose de ces deux passages : les trois premiers cas du premier, le 
 Coût en contexte permanent (`claude plugin details`) : ~150 tokens pour `render-video` (estimé ~100), ~730 pour le plugin ; ~1,5k à chaque appel.
 
 Reste à faire pour le critère 3 : l'enchaînement complet sur un brief de 3 scènes, de `new-video` à `render-video`, sans que Soon touche au code ; `probe.sh` y est déjà constaté sur un vrai rendu de Remotion (essai réel ci-dessus).
+
+### Skill `sync-voiceover` — en cours, 2026-10-28
+
+Avec Bash (ffmpeg, `whisper-cli`, `preview.sh`). Proposé à Soon et accepté avant toute écriture : deux scripts testés, que l'architecture ne prévoyait pas, pour la partie déterministe — `transcribe.sh` (ffmpeg en WAV 16 kHz mono, `whisper-cli`, `public/voiceover.json`) et `cues.sh` (repères en images) ; `templates/timing-voiceover.ts`, que le skill pose en `src/timing.ts` à la première synchronisation.
+
+Constaté le 2026-10-28, sur Remotion 4.0.538 (projet d'essai du 2026-10-24, scratchpad) : `import voiceover from "../public/voiceover.json"` dans `src/timing.ts` passe `remotion bundle` et `tsc` ; sans le fichier, le bundle échoue (`Module not found: Can't resolve '../public/voiceover.json'`). Le `timing.ts` que pose `new-video` reste donc sans import : un projet sans voix off doit se construire. Les scènes lisent bien leurs repères par `src/timing.ts`, comme le veut l'architecture : `cueFrame(scene, n)`, l'image du repère `n` depuis le début de la scène. Le skill officiel `remotion-captions` (4.0.538) : description « Transcribing, displaying and animating captions » ; il transcrit par `@remotion/whisper-webgpu` (GPU requis) et impose le type `Caption` (`text`, `startMs`, `endMs`, `timestampMs`, `confidence`) : les mots de `voiceover.json` prennent ce type.
+
+Whisper : `whisper-cpp` 1.8.4 dans la révision épinglée du poste (`nixconf paquet whisper-cpp pc`), binaire `whisper-cli` ; ajouté par `/plugin-nixos:modifie` à `conf-nixos/modules/programs/dev.nix` (domaine `developpement`) : construction de `pc` exit 0, `nvd` : `[A+] whisper-cpp 1.8.4` seul paquet ajouté, lints propres, `bats tests/` 168 ok. Reconstruction lancée par Soon.
+
+#### `cues.sh`, test d'abord
+
+Rouge, avant le script :
+
+```
+$ bash tests/static/test_cues.sh
+  ÉCHEC  scripts/cues.sh présent
+         absent
+test_cues : 0 réussis, 1 échoués, 0 sautés
+exit 1
+```
+
+Vert, après : `test_cues : 71 réussis, 0 échoués, 0 sautés`, exit 0. Cas couverts : chaque repère dans sa scène (rapport, repères écrits par scène dans `voiceover.json`, anciens remplacés, mots gardés, `storyboard.md` inchangé, relance idempotente) ; voix plus longue que la vidéo (642 images pour 600 : exit 1, rien d'écrit ; finie à l'image 600 pile : exit 0) ; repère hors de sa scène, et sur l'image qui suit juste la fin de sa scène ; mot mal entendu (« Nausio. » pour Notio : sans mot, le suivant trouvé quand même), puis `wordIndex` qui l'emporte ; mot dit deux fois ; casse et accents (`IDÉES` trouve `idées`) ; cadence du storyboard (25 i/s, image −10 dans sa scène) ; arrondi de 58,5 à 59 comme `Math.round` ; refus (projet, storyboard, bloc json, cadence, voix off absente, scène, durée, id en double, repère sans mot, `wordIndex` négatif, décimal ou au-delà des mots, `voiceover.json` absent ou illisible, sans mot, mot sans temps numérique). Huit mutations du script, chacune prise par le test : arrondi par défaut, début de scène oublié, curseur qui n'avance pas, casse ASCII seule, fin de scène incluse, écriture même non calée, `wordIndex` ignoré, voix trop longue ignorée. `shellcheck -S warning` : rien sur `cues.sh` ; sur le test, le seul SC2034 de `SUITE`.
+
+`templates/timing-voiceover.ts`, test changé d'abord : `test_templates : 4 réussis, 1 échoués, 0 sautés` (`templates/timing-voiceover.ts présent : absent`), exit 1 ; puis `7 réussis`, exit 0 : identique au `src/timing.ts` d'un projet synchronisé des cas d'évaluation, même `msToFrame` que `timing.ts`, import de `public/voiceover.json` et `cueFrame(scene, n)`.
+
+#### Suite d'évaluation
+
+`evals/sync-voiceover/` : deux cas positifs (« J'ai enregistré la voix off dans public/voix.wav, cale les animations dessus. », trois scènes validées et leurs repères, sans `voiceover.json` ; « La voix off dépasse la fin de la vidéo, recale tout. », une transcription qui finit à 21,4 s, image 642, pour 600 images), deux négatifs (« Ajoute des sous-titres animés en bas de l'écran, mot par mot, à partir de la voix off. » ; « Ajoute une musique de fond, public/musique.mp3, nettement plus bas que la voix. »). Trois exécutions, outils en lecture seule, sans Bash. `setup.sh` tirés d'un même générateur, autonomes ; chacun pose un remplaçant de `remotion-captions`, même nom et même description, corps réécrit, dans `$HOME/../config/skills/`, comme celui de `remotion-render` dans `evals/render-video/`. Lancement hors de `pp.sh eval-run`, `--scaffold` ajouté, verdict par `pp.sh eval-verdict`. Plafonds fixés à 0,40 USD par session, avant l'annonce.
+
+Rouge, avant le skill (un bras, plafond 6 USD pour 12 sessions, `--keep-temp` ; « oui » de Soon) :
+
+```
+$ claude plugin eval /home/soon/Documents/Claude-plugin/plugin-motion --case 'sync-voiceover-*' --no-publish --max-cost-usd 6 --ablation none --keep-temp --scaffold --output-dir …/evals/results/sync-voiceover-20261028T184249
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-captions (négatif) : WITH 1.00, Δ —
+rouge : sync-voiceover-music : WITH 0.50, Δ —
+rouge : sync-voiceover-overflow : WITH 0.00, Δ —
+rouge : sync-voiceover-recorded : WITH 0.00, Δ —
+coût : 4,83 USD
+verdict : rouge
+exit 1
+```
+
+`remotion-captions` est chargé dans chacune des 12 sessions (événement `init` des traces gardées). Sans le skill, sur la voix enregistrée, le modèle invoque `remotion-captions` dans les trois exécutions et propose `@remotion/whisper-webgpu`, ou de relever les temps à la main dans Audacity. Sur la voix trop longue, il calcule juste (image 642, « Disponible » à 168 dans `Final`) mais ne repasse jamais `Final` en `construite` ; une réponse propose de couper le silence de la voix, une autre invoque `plugin-motion:storyboard`. Les trois refus de `music-under-voice` portaient sur des réponses justes (un `<Audio>` de `musique.mp3` à 0,12 sous la voix gardée), refusées parce qu'elles commencent par « La musique n'est pas ajoutée », la session étant en lecture seule : critère précisé (« done or given as the change to make in src/Root.tsx »), à confirmer au vert.
+
+Premier vert, après le skill (`check-skill` : conforme ; deux bras, plafond 12 USD pour 24 sessions, `--keep-temp` ; « oui » de Soon), raté :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-*' --no-publish --max-cost-usd 12 --keep-temp --scaffold --output-dir ./evals/results/sync-voiceover-20261028T201858
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-captions (négatif) : WITH 1.00, Δ +0.00
+rouge : sync-voiceover-music : WITH 0.67, Δ -0.33
+rouge : sync-voiceover-overflow : WITH 0.67, Δ +0.67
+rouge : sync-voiceover-recorded : WITH 0.67, Δ +0.67
+coût : 9,93 USD
+verdict : rouge
+exit 1
+```
+
+Le déclenchement tient : `sync-voiceover` part dans les 6 exécutions positives avec le plugin et dans aucune des 6 négatives ; sans le plugin, les deux positifs restent à 0,00. Les trois cas rouges le sont sur la réponse. `recorded` : les deux réponses refusées donnaient les bonnes commandes sans dire ce que fait `transcribe.sh`, ni « whisper.cpp » ni « mot par mot » ; défaut du skill, corrigé : sans terminal, il dit ce que fait chaque commande. `overflow` : la réponse refusée remplissait les trois points (642 pour 600, `Final` de 210 à 260, `construite`, `cues.sh`), avec un vote partagé du juge `haiku` (FAIL PASS FAIL) : critère précisé. `music` : deux votes partagés sur des réponses justes (`<Audio>` à 0,12 ou 0,15, voix gardée), le skill ne partant pas et le témoin passant 3 sur 3 : critère précisé. `captions`, 6 sur 6, gardé : ni la description du skill ni ses données n'ont changé.
+
+Relance des trois autres cas (deux bras, « oui » de Soon, plafond total 9 USD). Le motif `sync-voiceover-[mor]*` ne prend aucun cas (« No eval cases found matching », exit 1, aucune session) : `--case` n'accepte pas les crochets. Relance cas par cas, 3 USD chacun :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-recorded' --no-publish --max-cost-usd 3 --keep-temp --scaffold --output-dir ./evals/results/sync-voiceover-recorded-20261028T222123
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+rouge : sync-voiceover-recorded : WITH 0.67, Δ +0.67
+coût : 1,93 USD
+verdict : rouge
+exit 1
+$ claude plugin eval . --case 'sync-voiceover-overflow' --no-publish --max-cost-usd 3 --keep-temp --scaffold --output-dir ./evals/results/sync-voiceover-overflow-20261028T222904
+claude plugin eval : exit 0
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-overflow (positif) : WITH 1.00, Δ +1.00
+coût : 2,32 USD
+verdict : vert
+exit 0
+$ claude plugin eval . --case 'sync-voiceover-music' --no-publish --max-cost-usd 3 --keep-temp --scaffold --output-dir ./evals/results/sync-voiceover-music-20261028T223742
+claude plugin eval : exit 0
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-music (négatif) : WITH 1.00, Δ +0.00
+coût : 0,90 USD
+verdict : vert
+exit 0
+```
+
+`music` : 6 sur 6, `sync-voiceover` jamais appelé. `overflow` : 3 sur 3 avec le plugin, 0 sur 3 sans. `recorded`, lu dans les traces gardées : les trois réponses avec le plugin disent ce que font les deux commandes (whisper.cpp, `whisper-cli`, mot par mot, en local ; image du début du mot, à 30 i/s, depuis le début de sa scène, lue par `cueFrame`). Les deux refusées, après un détour, manquent le point (1) du critère, les repères nommés avec leurs mots et leurs scènes : faute de shell, le modèle a confié les deux scripts à un agent `general-purpose`, qui n'en avait pas plus, puis a répondu sans l'annonce de l'étape 1 (les mots sans leurs scènes dans l'une, aucun mot dans l'autre). La réponse acceptée, sans agent, ouvre sur le tableau des scènes, de leurs statuts et de leurs repères. Le skill demandait déjà l'annonce sans terminal ; il est précisé : ne pas confier les commandes à un agent, et ouvrir la dernière réponse, celle que Soon lit, sur l'annonce de l'étape 1 (`check-skill` : conforme ; `check-evals` : conforme). Le corps du skill ayant changé, `recorded` et `overflow` sont à relancer ; `captions` et `music` ne déclenchent pas le skill et sa description est inchangée : leurs verts tiennent.
+
+Relance de ces deux cas, skill précisé (deux bras, plafond 3 USD chacun ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-recorded' --no-publish --max-cost-usd 3 --keep-temp --scaffold --output-dir ./evals/results/sync-voiceover-recorded-20261028T234236
+claude plugin eval : exit 0
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-recorded (positif) : WITH 1.00, Δ +1.00
+coût : 2,19 USD
+verdict : vert
+exit 0
+$ claude plugin eval . --case 'sync-voiceover-overflow' --no-publish --max-cost-usd 3 --keep-temp --scaffold --output-dir ./evals/results/sync-voiceover-overflow-20261028T235148
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+rouge : sync-voiceover-overflow : WITH 0.67, Δ +0.67
+coût : 1,81 USD
+verdict : rouge
+exit 1
+```
+
+`recorded` : 3 sur 3 avec le plugin, sans agent, chaque réponse ouverte sur les scènes et leurs repères ; 0 sur 3 sans. `overflow` : avec le plugin, votes PASS PASS PASS, PASS PASS FAIL, et FAIL FAIL FAIL sur la première exécution, dont la réponse remplit pourtant les trois points, comme les deux acceptées : voix finie à 21 400 ms, image 642, 42 images de trop ; `Final` de 210 à au moins 260 images, total 650, dans `storyboard.md` et `src/Root.tsx` (`<Composition>`, `<Series.Sequence>`, durée de `Video`), aucune autre scène changée ; `Final` repassée de `validée` à `construite`, ses repères recalculés par `cues.sh` ; l'audio intact. Sa trace ne diffère des deux autres que par `src/Root.tsx` non lu. Le juge `haiku` ne donne que ses votes, pas leurs raisons. Deuxième refus d'une réponse complète sur ce critère, après le premier vert : blocage exposé à Soon, enregistré au point de reprise. Coût des évaluations de `sync-voiceover` à ce point : 23,91 USD.
+
+Relance d'`overflow` seul avec le juge `sonnet`, critère et skill inchangés (deux bras, plafond 3 USD ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-overflow' --no-publish --max-cost-usd 3 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/sync-voiceover-overflow-20261029T141934
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+rouge : sync-voiceover-overflow : WITH 0.33, Δ +0.33
+coût : 2,11 USD
+verdict : rouge
+exit 1
+```
+
+Votes unanimes cette fois : FAIL FAIL FAIL, FAIL FAIL FAIL, PASS PASS PASS avec le plugin, FAIL ×3 sans. Les trois réponses donnent les mêmes nombres (642, 42 de trop, `Final` de 210 à 260, total 650, aux quatre endroits) et la même suite (`cues.sh`, `Final` en `construite`). Une seule différence, systématique : les deux refusées repassent aussi Ouverture et Message en `construite`, « puisque leurs repères seront écrits pour la première fois » dans `public/voiceover.json` ; l'acceptée garde « Ouverture et Message ne bougent pas ». L'état du cas est celui d'une voix réenregistrée : `transcribe.sh` vide `cues`, `storyboard.md` garde les images de la première prise (vite 59, Notez 18, retrouvez 72, Notio 18, Disponible 72) ; seul Disponible passe à 168. Par la règle de l'étape 6 du skill, une scène touchée a changé d'image de repère, de durée ou de code : Ouverture et Message ne le sont pas. Le skill ne dit pas contre quoi comparer l'image d'un repère, et un repère réécrit à la même image y passe pour un changement : deux réponses sur trois renvoient en revue des scènes déjà validées. Le juge ne rend que ses votes : cette lecture est la seule différence trouvée, pas sa raison donnée. Troisième rouge d'`overflow` au vert : blocage exposé à Soon. Coût des évaluations de `sync-voiceover` à ce point : 26,02 USD.
+
+Avec l'accord de Soon, étape 6 du skill précisée (une scène est touchée quand sa durée ou son code change, ou quand l'image d'un de ses repères diffère du `"frame"` qu'il avait dans `storyboard.md` ; un repère réécrit dans `public/voiceover.json` à la même image ne la touche pas) et clause FAIL ajoutée à `lengthen-final` (Ouverture ou Message renvoyée en `construite`) ; `check-skill` et `check-evals` : conformes. Relance des deux positifs, juge `sonnet` (deux bras, plafond 3 USD chacun ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-recorded' --no-publish --max-cost-usd 3 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/sync-voiceover-recorded-20261029T143016
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+rouge : sync-voiceover-recorded : WITH 0.83, Δ +0.83
+coût : 1,91 USD
+verdict : rouge
+exit 1
+$ claude plugin eval . --case 'sync-voiceover-overflow' --no-publish --max-cost-usd 3 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/sync-voiceover-overflow-20261029T143724
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+rouge : sync-voiceover-overflow : WITH 0.33, Δ +0.33
+coût : 1,85 USD
+verdict : rouge
+exit 1
+```
+
+`overflow` : les trois réponses gardent désormais Ouverture et Message `validée` ; la précision a pris. Deux restent refusées (FAIL ×3), une acceptée (PASS ×3), sur les mêmes nombres (642, 42 de trop, `Final` de 210 à 260, total 650, aux quatre endroits), `Final` en `construite` et `cues.sh` dans les trois : aucune différence trouvée entre elles qui touche le critère. Sur les 12 exécutions jugées par `sonnet`, les trois votes sont toujours unanimes : ils ne sont pas indépendants, et une réponse se joue sur un seul jugement. `recorded` : la réponse refusée dit « Les scènes dont les repères bougent repasseront de `validée` à `construite` », sans dire lesquelles, quand le point (4) veut les scènes dont les repères sont posés ; ici aucun repère n'avait d'image, les trois scènes sont touchées. Effet probable de la précision de l'étape 6, qui ne dit pas qu'un repère sans `"frame"` change en en prenant une. Quatrième rouge d'`overflow` au vert : blocage exposé à Soon. Coût des évaluations de `sync-voiceover` à ce point : 29,78 USD.
+
+Rejeu du juge avec ses raisons (« oui » de Soon) : 4 appels `claude -p --model sonnet --tools "" --strict-mcp-config --disable-slash-commands`, prompt système de juge, critère exact et réponse tirés de `aggregate-result.json` (`evidence`, de la longueur du dernier message de chaque trace gardée), consigne de passer chaque point PASS et chaque clause FAIL avec la citation de la réponse ; 0,11 USD. `overflow` bras with 1, 2 et 3 : PASS, PASS, PASS ; `recorded` bras with 1 : PASS, le point (4) tenu par « Les scènes dont les repères bougent repasseront de `validée` à `construite` ». Les trois réponses refusées remplissent donc leur critère. Le prompt du juge de `claude plugin eval` 2.1.309, lu dans son binaire : « You are grading the output of a coding agent against a criterion. Criterion: … Agent output … Respond with exactly one word: PASS or FAIL. » Un mot, sans raisonnement, sur trois ou quatre points et quatre ou cinq clauses FAIL : la source des refus. Correction, accord de Soon : chaque critère `llm` découpé en graders `regex` pour les faits écrits tels quels et en `llm` d'un seul point — `overflow` : `642`, `cues\.sh`, `Final[^\n]*construite`, `final-only` (Final seule à 252 images au moins, audio intact), `others-validated` (Ouverture et Message pas renvoyées en `construite`) ; `recorded` : `voiceover-json` gardé, `whisper-cli`, `timing\.ts`, `construite`, `cues-named`, `frame-from-word`, `scenes-back`, `whisper-only`. Rejouées sur les 12 réponses gardées, les regex prennent les 6 bras with et laissent chaque bras without en échec sur une au moins (`cues.sh`, `whisper-cli`). Étape 6 du skill précisée : un repère sans `"frame"` qui en prend une touche sa scène ; sans terminal, la réponse nomme les scènes qui repassent en `construite`. `check-evals` : conforme, 4 cas ; `check-skill` : conforme. Coût des évaluations de `sync-voiceover` à ce point : 29,89 USD.
+
+Relance des deux positifs, graders découpés et skill précisé, juge `sonnet` (deux bras, plafond 3 USD chacun ; « oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-recorded' --no-publish --max-cost-usd 3 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/sync-voiceover-recorded-20261029T173634
+claude plugin eval : exit 0
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-recorded (positif) : WITH 1.00, Δ +0.92
+coût : 1,51 USD
+verdict : vert
+exit 0
+$ claude plugin eval . --case 'sync-voiceover-overflow' --no-publish --max-cost-usd 3 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/sync-voiceover-overflow-20261029T174357
+claude plugin eval : exit 1
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+rouge : sync-voiceover-overflow : WITH 0.80, Δ +0.40
+coût : 1,93 USD
+verdict : rouge
+exit 1
+```
+
+`recorded` : 3 sur 3 avec le plugin, les 8 graders passés dans chaque exécution ; les trois réponses nomment les scènes qui repassent en `construite` (« les trois scènes (Ouverture, Message, Final) repassent de `validée` à `construite` ») : la précision de l'étape 6 a pris. Sans le plugin, 0, 0 et 0,25. `overflow` : avec le plugin, `642`, `cues\.sh`, `Final[^\n]*construite` et `others-validated` passés dans les trois exécutions ; `final-only` refusé dans les trois (PASS FAIL FAIL, FAIL ×3, FAIL ×3). Les trois réponses y répondent pourtant : Final de 210 à 260 images, total 650, durée changée dans `storyboard.md`, `src/Root.tsx` et `Video`, Ouverture et Message inchangées, l'audio intact. Les votes ne sont plus tous unanimes. Cinquième rouge d'`overflow` au vert, toujours un juge d'un mot qui refuse une réponse complète : blocage exposé à Soon, enregistré au point de reprise. Coût des évaluations de `sync-voiceover` à ce point : 33,33 USD.
+
+Diagnostic de `final-only`, choisi par Soon : rejouer le prompt d'un mot du harnais sur les trois réponses, puis retirer une clause du critère à chaque essai. Le prompt exact, lu dans le binaire 2.1.309 : système « You are a strict, terse evaluation judge for coding-agent traces. » ; message « You are grading the output of a coding agent against a criterion. », `Criterion:`, le critère, `Agent output (last_message):`, la réponse, « Respond with exactly one word: PASS or FAIL. ». Le vote vaut PASS si la réponse contient `PASS` et pas `FAIL`. Le juge part avec `thinkingConfig: {type: "disabled", mechanical: true}`, sans réflexion ; son coût le confirme (0,032 USD pour 6 appels d'environ 1 800 jetons d'entrée, rien en sortie). Le rejeu par `claude -p --model sonnet --tools ""` sur la réponse 2, à qui le harnais a donné FAIL ×3 : PASS 7 fois sur 7, mais sonnet 5.5 y réfléchit toujours, 130 à 240 jetons, que la réflexion soit coupée par `MAX_THINKING_TOKENS=0`, `CLAUDE_CODE_DISABLE_THINKING=1` ou `alwaysThinkingEnabled: false`, l'effort en `low` ou en `high`. Le juge du harnais ne se reproduit pas sans clé d'API, et il n'y en a pas sur le poste : l'ablation n'a pas été faite. Constat : c'est le juge sans réflexion qui refuse `final-only` ; avec réflexion, d'un mot ou avec raisons, il le passe. Coût du diagnostic : 0,05 USD ; total des évaluations de `sync-voiceover` : 33,38 USD.
+
+Correction, avec l'accord de Soon : `final-only` découpé en contrôles d'un point, au modèle d'`others-validated`, le seul juge qui passait. Une regex `total-650` (`\b650\b`) pour le nouveau total : le minimum de la règle de l'étape 4, 642 + `exit` 8 du thème du cas. Deux juges, `others-unchanged` (Ouverture à 150 images, Message à 240 ; « FAIL only if » leur durée change) et `audio-intact` (« FAIL only if » la voix est coupée, accélérée ou rognée). Sur les 30 réponses gardées des cinq relances d'`overflow`, `total-650` est présente dans les 15 avec le plugin et absente des 15 sans. `pp.sh check-evals . sync-voiceover` : conforme, 4 cas.
+
+Relance d'`overflow` seul, juge `sonnet`, lancée par Soon dans son terminal :
+
+```
+$ claude plugin eval . --case 'sync-voiceover-overflow' --no-publish --max-cost-usd 3 --keep-temp --scaffold --judge-model sonnet --output-dir "./evals/results/sync-voiceover-overflow-$(date +%Y%m%dT%H%M%S)"
+→ ./evals/results/sync-voiceover-overflow-20261029T181659
+$ bash pp.sh eval-verdict . sync-voiceover …/aggregate-result.json
+ok : sync-voiceover-overflow (positif) : WITH 1.00, Δ +0.48
+coût : 1,78 USD
+verdict : vert
+exit 0
+```
+
+Avec le plugin, les 8 graders passent dans les trois exécutions, chaque juge à PASS ×3. Sans le plugin, 0,57, 0,57 et 0,43 : `cues\.sh`, `Final[^\n]*construite` et `total-650` absents des trois réponses, `audio-intact` refusé (FAIL ×3) dans la troisième. Les quatre cas de `sync-voiceover` sont verts : `captions` et `music` (négatifs) avant la précision de l'étape 6, qui ne touche pas la description ; `recorded` (20261029T173634, 1.00, Δ +0.92) ; `overflow` (20261029T181659, 1.00, Δ +0.48). Coût des évaluations de `sync-voiceover` : 35,16 USD.
+
+#### Whisper sur le poste, constaté le 2026-10-28
+
+Après la reconstruction de Soon : `whisper-cli` (whisper.cpp 1.8.4, CPU, `libggml-cpu-haswell`), avec `whisper-vad-speech-segments` et `whisper-cpp-download-ggml-model` dans le même paquet ; formats lus : flac, mp3, ogg, wav ; langue `en` par défaut. Sortie mot par mot : `-ml 1 -sow` (un mot par segment) avec `-oj` ou `-ojf` (jetons, probabilités) ; `-dtw <préréglage>` (temps des jetons par DTW) n'agit qu'avec `-nfa` : sinon `dtw_token_timestamps is not supported with flash_attn - disabling`. Tailles lues dans les en-têtes de huggingface.co/ggerganov/whisper.cpp : base 148 Mo, small-q5_1 190 Mo, small 488 Mo, medium-q5_0 539 Mo, large-v3-turbo-q5_0 574 Mo, medium 1 534 Mo, large-v3-turbo 1 625 Mo. Modèle choisi par Soon : `ggml-large-v3-turbo-q5_0.bin`, téléchargé dans `~/.cache/plugin-motion/` (sha256 `394221709c…ffa7e2`, celui de Hugging Face) ; modèle de détection vocale `ggml-silero-v6.2.0.bin` (885 Ko, ggml-org/whisper-vad, sha256 `2aa269b785…fb6987`), accord de Soon après le constat ci-dessous.
+
+#### Essai réel, critère 5
+
+**Extrait.** Enregistré par Soon le 2026-10-28 par le micro du bureau à distance (`pw-record --target 69 --channels 1`, « Remoteaudio Source », seule source du poste) : WAV 48 kHz mono de 25,55 s, bruit de fond à −35 dB RMS, le texte « Vos idées vont trop vite ? / Notez tout, / retrouvez tout. / Notio. / Disponible sur iOS et Android. » entre 15,6 et 25 s. Extrait d'essai coupé à 14,000 s par ffmpeg (échantillons décodés identiques à l'original, 554 496 échantillons), hors du dépôt, dans le scratchpad ; seules les sorties de whisper entrent dans `tests/fixtures/voiceover/`.
+
+**Vérité de terrain, sans Whisper.** `silencedetect` échoue sur ce bruit (pics à −12,8 dB) : enveloppe RMS par fenêtres de 10 ms (`asetnsamples=480,astats`) ; une prise de parole est la première fenêtre au-dessus de −25 dB (0,7 % des fenêtres de bruit) après 300 ms en dessous. Cinq prises, une par mot visé, chacune contrôlée sur le spectrogramme (`showspectrumpic`) : les harmoniques de la voix commencent au début mesuré ; celui de « Disponible » se lit /di/ voisé, /s/ (énergie au-dessus de 3 kHz), occlusion du /p/, puis « o » : le mot, pas un souffle. À −30 dB, le bruit avance « Notez » de 270 ms : seuil gardé à −25. Débuts dans l'extrait : Vos 1,67 s (le /v/ voisé monte dès ~1,59), Notez 3,94–3,95, retrouvez 5,39, Notio 7,13, Disponible 8,16.
+
+**Whisper seul ne tient pas ±3 images.** Sur l'extrait, `large-v3-turbo-q5_0`, `-l fr` :
+
+| Mot visé | Vérité | `-ml 1 -sow` | `-dtw large.v3.turbo -nfa` (`t_dtw`) | segments de la détection vocale, `-vp 0` |
+| --- | --- | --- | --- | --- |
+| Vos | 1,67 | 0,00 | 1,76 | 1,66 |
+| Notez | 3,95 | 2,86 | 4,20 | 3,94 |
+| retrouvez | 5,39 | 4,58 | 5,62 | 5,38 |
+| Notio | 7,13 | 6,06 | 7,36 | 7,14 |
+| Disponible | 8,16 | 7,73 | 8,38 | 8,16 |
+
+Sans DTW, Whisper fait commencer un mot dit après une pause à la fin du mot précédent, pause comprise : jusqu'à 1,1 s trop tôt (33 images). Le DTW retarde de 90 à 250 ms. `--vad` dans `whisper-cli` supprime l'hallucination du silence (« Sous-titrage Société Radio-Canada » sur 10 s sans voix, 0 mot avec `--vad`) mais ne recale pas les mots. La détection vocale (silero, réseau de neurones), méthode indépendante de l'enveloppe d'énergie, tombe à ±10 ms de la vérité. D'où la règle de `transcribe.sh`, approuvée par Soon : un mot dans l'intervalle Whisper duquel s'ouvre un segment de parole commence à ce début de segment. Limite constatée, mots en milieu de phrase (début de l'occlusion du /t/) : « trop » 2,38 s, Whisper 2,36 ; « tout » de « Notez tout » 4,31 s, Whisper 3,95 (−11 images) ; « tout » de « retrouvez tout » 5,77 s, Whisper 5,52 (−7,5 images) ; DTW +160 à +230 ms. Après une pause, Whisper prend un mot de retard que la règle ne rattrape que pour le premier mot. `cues.sh` marque donc chaque repère `atSpeechStart` : vrai quand son mot ouvre un segment de parole, le seul cas garanti.
+
+**Chaîne réelle.** Projet Remotion 4.0.538 du scratchpad (le `node_modules` du 2026-10-24), 640×360 à 30 i/s, Ouverture 100, Message 100, Final 160 images ; `src/timing.ts` = `templates/timing-voiceover.ts` ; chaque scène noire, blanche sur la seule image `cueFrame(id, n)` de chacun de ses repères ; `<Audio src={staticFile("voix.wav")} />` dans `Video`.
+
+```
+$ bash scripts/transcribe.sh …/essai-voix public/voix.wav
+{ "words": 15, "speech": 5, "corrected": 4, "endMs": 10030, "endFrame": 301, "total": 360, "overflow": 0, … }
+78 s ; exit 0
+$ bash scripts/cues.sh …/essai-voix
+verdict « calé », written true ; Vos 50, Notez 118, retrouvez 161, Notio 214, Disponible 245 (images dans la vidéo), atSpeechStart vrai pour les cinq
+exit 0
+$ npx remotion render src/index.ts Video out/essai-voix.mp4
+Encoded 360/360 ; 9,4 s ; exit 0
+$ bash scripts/probe.sh …/essai-voix out/essai-voix.mp4
+conforme : 360 images, audio exigé et présent ; exit 0
+```
+
+Mesuré dans le MP4 lui-même : images blanches (`signalstats`, YAVG > 128) 50, 118, 161, 214, 245, les 355 autres noires ; débuts des mots sur sa piste AAC (même enveloppe, −25 dB) 1,67, 3,95, 5,40, 7,13, 8,18 s.
+
+| Repère | Flash | Mot dans le MP4 (× 30) | Écart | Vérité de l'extrait (× 30) | Écart |
+| --- | --- | --- | --- | --- | --- |
+| Vos | 50 | 50,1 | −0,1 | 50,1 (47,7 au début du /v/) | −0,1 (+2,3) |
+| Notez | 118 | 118,5 | −0,5 | 118,2 | −0,2 |
+| retrouvez | 161 | 162,0 | −1,0 | 161,7 | −0,7 |
+| Notio | 214 | 213,9 | +0,1 | 213,9 | +0,1 |
+| Disponible | 245 | 245,4 | −0,4 | 244,8 | +0,2 |
+
+**Critère 5 tenu** : les cinq animations tombent à 1 image au plus du mot visé (2,3 en comptant le voisement du /v/), pour ±3 exigées. Whisper seul les aurait placées 18 à 35 images trop tôt (Notez 86, retrouvez 136, Notio 179, Disponible 227). Non couvert : un repère sur un mot en milieu de phrase, signalé par `atSpeechStart` faux.
+
+#### `transcribe.sh` et `atSpeechStart`, test d'abord
+
+Écrits après le constat de Whisper ci-dessus, avant la chaîne réelle. `test_transcribe` remplace ffmpeg, `whisper-cli` et `whisper-vad-speech-segments` par des doublures qui rejouent leurs sorties enregistrées sur l'extrait de Soon et sur 10 s de silence (`tests/fixtures/voiceover/`) : ni réseau, ni modèle, ni audio.
+
+Rouge, avant le script :
+
+```
+$ bash tests/static/test_transcribe.sh
+  ÉCHEC  scripts/transcribe.sh présent
+         absent
+test_transcribe : 0 réussis, 1 échoués, 0 sautés
+exit 1
+```
+
+Vert, après : `test_transcribe : 50 réussis, 0 échoués, 0 sautés`, exit 0. Cas couverts : transcription (résumé JSON, 15 mots, 5 segments de parole, 4 débuts recalés ; segment vide de Whisper écarté ; mots au type `Caption` ; Notez recalé de 2 850 à 3 940 ms, les mots dits sans pause gardant le début de Whisper ; confiance, la plus faible des jetons du mot ; repères d'une transcription précédente effacés ; arguments de ffmpeg, de `whisper-cli` et de la détection vocale ; WAV converti hors du projet, dossier temporaire retiré ; seul `public/voiceover.json` change) ; langue passée à whisper et écrite ; silence (exit 1, rien d'écrit) ; refus (projet, fichier audio absent ou hors de `public/`, cadence, modèle Whisper ou de détection vocale absent avec sa taille et sa commande, ffmpeg, `whisper-cli` ou `whisper-vad-speech-segments` absent, erreur de ffmpeg ou de whisper, sortie illisible ; un refus n'écrit rien). Neuf mutations du script, chacune prise par le test : sans recalage (2 échecs), confiance la plus forte (2), détection vocale avec marge (1), segments vides gardés (7), fichier hors de `public/` accepté (3), repères gardés (1), dernier segment ouvert après le début du mot au lieu du premier dans son intervalle (5), langue ignorée (1), silence écrit (3). `shellcheck` : rien sur `transcribe.sh`.
+
+`atSpeechStart` dans `cues.sh`, test changé d'abord (vrai quand un segment de parole de `voiceover.json` s'ouvre après le début du mot précédent et au plus tard au début du mot du repère ; nul sans segments) :
+
+```
+$ bash tests/static/test_cues.sh
+  ÉCHEC  vite : mot 4 « vite ? », 1960 ms, image 59, scène à 0
+  ÉCHEC  vite, dit en milieu de phrase, n'ouvre pas de segment de parole
+  ÉCHEC  Notez, retrouvez, Notio et Disponible ouvrent chacun un segment
+  ÉCHEC  idées, au milieu de la première phrase, n'ouvre pas de segment
+  ÉCHEC  le premier mot ouvre le premier segment, qui commence avec lui
+test_cues : 72 réussis, 5 échoués, 0 sautés
+exit 1
+```
+
+Vert, après : `test_cues : 77 réussis, 0 échoués, 0 sautés`, exit 0 ; puis le refus de segments de parole mal formés, `78 réussis`, exit 0. Deux mutations de plus, prises : un segment ouvert au début même du mot précédent compté (1 échec) ; un segment ouvert au début même du mot du repère oublié (2).

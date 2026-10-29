@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "name": "sync-voiceover-captions",
+  "description": "Demande voisine, du ressort du skill officiel remotion-captions, chargé dans la session : afficher des sous-titres mot par mot n'est pas caler les animations des scènes sur la voix.",
+  "tags": [
+    "sync-voiceover",
+    "negative",
+    "remotion-captions"
+  ],
+  "runs": 3,
+  "expected_outcome": "Le skill sync-voiceover n'est pas invoqué ; la réponse affiche des sous-titres animés mot par mot en bas de l'image, à partir des mots de la voix off, sans toucher aux repères, aux durées ni aux statuts des scènes.",
+  "context": {
+    "scaffold_script": "setup.sh"
+  },
+  "execution": {
+    "prompt": "Ajoute des sous-titres animés en bas de l'écran, mot par mot, à partir de la voix off.",
+    "max_turns": 8,
+    "allowed_tools": [
+      "Skill",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "graders": [
+    {
+      "name": "skill-not-fired",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?sync-voiceover\"",
+      "min": 0,
+      "max": 0,
+      "arm": "both"
+    },
+    {
+      "name": "captions-only",
+      "type": "llm",
+      "criteria": "PASS if the final reply deals with displaying captions at the bottom of the frame, word by word, from the words of the voiceover (the Caption words of public/voiceover.json, or a transcription): a captions component, @remotion/captions or createTikTokStyleCaptions, highlighting the word being spoken.\nFAIL if it changes a cue, a scene duration or a scene status, or if it recomputes the cue frames of the scenes.\n"
+    }
+  ]
+}
