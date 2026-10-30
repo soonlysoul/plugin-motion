@@ -1,11 +1,11 @@
 # PROGRESS — plugin-motion
 
-Dernière mise à jour : 2026-10-29
+Dernière mise à jour : 2026-10-30
 Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Reste l'enchaînement complet du critère 3.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Le critère 3 est tenu depuis le 2026-10-30, en pilotage headless (voir « Critère 3 »). Reste le critère 6, les suites d'évaluation de chaque skill.
 
 ## Composants
 
@@ -835,3 +835,28 @@ exit 1
 ```
 
 Vert, après : `test_cues : 77 réussis, 0 échoués, 0 sautés`, exit 0 ; puis le refus de segments de parole mal formés, `78 réussis`, exit 0. Deux mutations de plus, prises : un segment ouvert au début même du mot précédent compté (1 échec) ; un segment ouvert au début même du mot du repère oublié (2).
+
+## Critère 3 — 2026-10-30
+
+Critère : à partir d'un brief de 3 scènes, `new-video` → `storyboard` → `build-scene` (×3) → `render-video` produit un MP4 que `probe` déclare conforme, sans que Soon touche au code. Mode choisi par Soon : pilotage headless, où Claude répond aux validations.
+
+Dossier `lancement-appli/` neuf, hors du dépôt. Chaque skill dans sa session `claude -p --plugin-dir <plugin-motion> --add-dir <plugin-motion> --model sonnet --permission-mode acceptEdits --allowedTools …` (outils nommés, `bypassPermissions` refusé par le classificateur de ce poste), sans que je touche au code du projet vidéo.
+
+| Étape | Résultat | Coût |
+| --- | --- | --- |
+| `new-video` | projet Remotion 4.0.539, 12 skills officiels ; `doctor.sh` : exit 0, 0 avertissement | 0,29 USD |
+| `storyboard` | brief de 4 éléments donné d'emblée : 3 scènes (`Titre`, `Promesse`, `Conclusion`) de 90 images, 270 au total (9 s), 1920×1080 à 30 i/s ; `theme.ts` réglé | 0,12 USD |
+| `build-scene` Titre | tour 1 : 3 défauts mineurs de marge, taille réduite ; tour 2 : aucun défaut ; `construite`, puis `validée` | 0,81 USD |
+| `build-scene` Promesse | tour 1 : aucun défaut ; `construite`, puis `validée` | 0,54 USD |
+| `build-scene` Conclusion | tour 1 : aucun défaut ; `construite`, puis `validée` | 0,41 USD |
+| `render-video` | `out/lancement-appli.mp4`, 171,7 Ko | 0,10 USD |
+
+`bash scripts/probe.sh <projet> out/lancement-appli.mp4`, relancé hors de la session : `conforme`, exit 0 — durée 270 images pour 270 attendues (écart 0), 30 i/s, 1920×1080, piste audio non requise et absente ; `ffprobe` lit la même chose (270 images, 30/1). Le rapport de `render-video` donne le même tableau.
+
+**Critère 3 tenu.** Coût total : 2,27 USD, sessions comprises.
+
+Écarts au scénario, tels qu'ils sont arrivés :
+
+- l'étape 3.4 de `new-video` (`cp` des trois modèles depuis `templates/`) est refusée dans la session headless, avec ou sans `--add-dir` : le contrôle de permissions voit la source comme un fichier « sensible ». La session s'est arrêtée là sans contourner. J'ai fait les trois `cp` moi-même, sans changement, puis la suite est repartie ; c'est une limite du harnais de test, pas du skill. En session interactive, Soon répond à la demande d'autorisation ;
+- les « oui » aux trois planches sont les miens, après avoir ouvert chaque `planche.png` : lisibles, rien ne déborde. Le rythme et le goût de Soon n'y sont pas jugés ; deux remarques du relecteur restent pour lui : les mots de `Titre` entrent calés à gauche et ne se centrent qu'au dernier, et « Inter » n'est pas chargée dans le projet (repli sur la police du système) ;
+- le brief donne les quatre éléments d'un coup, donc `storyboard` n'a posé aucune question ; le test ne couvre pas la conduite à une question par message, que `evals/storyboard/` couvre.

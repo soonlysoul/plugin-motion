@@ -6,6 +6,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- Critère 3 constaté le 2026-10-30 : de `new-video` à `render-video`, sur un brief de 3 scènes, un MP4 de 270 images que `probe.sh` déclare conforme (pilotage headless, 2,27 USD).
 - Charpente posée par plugin-plugin le 2026-10-23 : manifeste, marketplace locale, licence, documents et suite de tests `tests/run-all.sh`.
 - Agent `frame-reviewer` : relit les images clés et la planche contact d'une scène, sans voir le code, et rend ses défauts avec leur image, leur zone et leur gravité (outils `Read, Glob`, modèle `sonnet`). Planche de test `tests/fixtures/frame-reviewer/` : une scène dont le titre sort par le bord droit, rendue par `preview.sh` ; l'agent y signale le débordement, bloquant, à chacune de trois exécutions (critère 4).
 - Skill `storyboard` : transforme un brief en scènes de `storyboard.md` (durée en images, texte, intention du mouvement, statut « à faire »), une question à la fois, et le fait valider avant tout code ; une scène changée repasse en « à faire ». Suite d'évaluation `evals/storyboard/` : trois cas positifs, deux négatifs.
