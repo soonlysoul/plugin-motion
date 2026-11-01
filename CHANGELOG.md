@@ -2,7 +2,7 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; versionnage [SemVer](https://semver.org/lang/fr/) : correctif pour une consigne corrigée, mineure pour un composant ajouté, majeure pour un changement qui casse l'existant.
 
-## [0.1.1] — en cours
+## [0.1.1] — 2026-11-01
 
 ### Corrigé
 
@@ -16,6 +16,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 - Critère 6 constaté le 2026-10-30 sur la 0.1.0 : les 22 cas des cinq suites d'évaluation passent sur leurs trois exécutions, juge `sonnet`.
 - Suites `evals/storyboard/` et `evals/build-scene/` : les critères `one-question-first`, `scene-plan` et `fix-and-review`, jugés en un mot sur trois ou quatre points, découpés en regex pour ce que le skill fait écrire tel quel et en juges d'un seul point, comme ceux de `evals/sync-voiceover/`. Les skills ne changent pas.
 - `evals/build-scene/build-scene-add-scene` : le critère `about-the-plan`, à quatre points, découpé en `pricing-scene` (regex), `no-scene-code` et `plan-first` (juges d'un point) ; la place de la scène ajoutée n'est plus jugée.
+
+Coût en contexte permanent : ~921 tokens — sync-voiceover ~190, render-video ~150, build-scene ~150, new-video ~120, storyboard ~120, frame-reviewer ~190.
 
 ## [0.1.0] — 2026-10-30
 
