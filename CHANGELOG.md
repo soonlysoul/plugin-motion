@@ -4,10 +4,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [0.1.1] — en cours
 
+### Corrigé
+
+- Polices du thème chargées : `templates/theme.ts` nommait « Inter » sans la charger, et le Chrome headless rendait une police de repli à empattements. Il charge désormais la police du titre et celle du texte par `@remotion/google-fonts`, que le rendu attend, et donne leur graisse dans `theme.fontWeights`. Chargée, Inter élargit le titre de la scène `Titre` du critère 3, qui passe sur deux lignes : les planches validées avant ne montraient pas la mise en page réelle. Le rendu télécharge les polices de fonts.gstatic.com et demande donc le réseau.
+- `new-video` installe `@remotion/google-fonts` (`npx remotion add`, à la version de `remotion`) ; `storyboard` change une police par sa ligne d'import et sa graisse, parmi celles que la police a (`skills/storyboard/reference/format.md`, « Fonts ») ; `build-scene` prend la graisse dans le thème avec la police, et signale un thème qui nomme ses polices sans les charger.
+- Les 19 `setup.sh` des évaluations posent le thème sous cette forme, déclarent `@remotion/google-fonts`, et leurs scènes prennent leur graisse dans le thème. `test_templates` le vérifie.
+- Suites de `new-video`, `storyboard` et `build-scene` relancées le 2026-11-01 sur ce changement : vertes, juge `sonnet`.
+
 ### Modifié
 
 - Critère 6 constaté le 2026-10-30 sur la 0.1.0 : les 22 cas des cinq suites d'évaluation passent sur leurs trois exécutions, juge `sonnet`.
 - Suites `evals/storyboard/` et `evals/build-scene/` : les critères `one-question-first`, `scene-plan` et `fix-and-review`, jugés en un mot sur trois ou quatre points, découpés en regex pour ce que le skill fait écrire tel quel et en juges d'un seul point, comme ceux de `evals/sync-voiceover/`. Les skills ne changent pas.
+- `evals/build-scene/build-scene-add-scene` : le critère `about-the-plan`, à quatre points, découpé en `pricing-scene` (regex), `no-scene-code` et `plan-first` (juges d'un point) ; la place de la scène ajoutée n'est plus jugée.
 
 ## [0.1.0] — 2026-10-30
 

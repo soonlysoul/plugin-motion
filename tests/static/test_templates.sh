@@ -27,6 +27,47 @@ for pair in theme.ts:src/theme.ts timing.ts:src/timing.ts storyboard.md:storyboa
   fi
 done
 
+# theme.ts loads its two fonts, title and body, with @remotion/google-fonts: a family only named
+# is not loaded, and the headless Chrome renders a fallback font. One weight per role, in
+# fontWeights, loaded and read by the scenes; the latin subset, enough for French.
+theme=$PLUGIN_ROOT/templates/theme.ts
+if [[ -f $theme ]]; then
+  ok=1
+  for role in title body; do
+    Role=${role^}
+    grep -qE "^import \{ loadFont as load${Role}Font \} from \"@remotion/google-fonts/[A-Z][A-Za-z0-9]*\";$" "$theme" || ok=0
+    grep -qF "const $role = load${Role}Font(\"normal\", { weights: [fontWeights.$role], subsets: [\"latin\"] });" "$theme" || ok=0
+  done
+  ((ok)) && pass "theme.ts charge la police du titre et celle du texte par @remotion/google-fonts" \
+    || fail "theme.ts charge la police du titre et celle du texte par @remotion/google-fonts" "$(grep -n -E 'import|load|fonts' "$theme")"
+  grep -qE '^const fontWeights = \{ title: "[1-9]00", body: "[1-9]00" \} as const;$' "$theme" \
+    && grep -qxF '  fontWeights,' "$theme" \
+    && pass "theme.ts donne une graisse par rôle, chargée et lue par les scènes (theme.fontWeights)" \
+    || fail "theme.ts donne une graisse par rôle, chargée et lue par les scènes (theme.fontWeights)" "$(grep -n -i 'weight' "$theme")"
+  grep -qxF '  fonts: { title: title.fontFamily, body: body.fontFamily },' "$theme" \
+    && pass "theme.fonts : les familles chargées, aucun nom écrit en dur" \
+    || fail "theme.fonts : les familles chargées, aucun nom écrit en dur" "$(grep -n 'fonts:' "$theme")"
+fi
+
+# Every eval case that lays a theme lays it in that form, declares @remotion/google-fonts at the
+# version of remotion, and its scenes take their weight from the theme with their family.
+for setup in "$PLUGIN_ROOT"/evals/*/*/setup.sh; do
+  grep -q '^export const theme = {$' "$setup" || continue
+  case_name=$(basename "$(dirname "$setup")")
+  if grep -qE '^  fonts: \{ title: "' "$setup"; then
+    fail "$case_name : thème qui charge ses polices" "$(grep -n '^  fonts:' "$setup")"
+    continue
+  fi
+  remotion=$(sed -n 's/^    "remotion": "\(.*\)"$/\1/p' "$setup")
+  grep -qF "\"@remotion/google-fonts\": \"$remotion\"" "$setup" \
+    && grep -qxF '  fonts: { title: title.fontFamily, body: body.fontFamily },' "$setup" \
+    && pass "$case_name : thème qui charge ses polices, @remotion/google-fonts $remotion déclaré" \
+    || fail "$case_name : thème qui charge ses polices, @remotion/google-fonts ${remotion:-?} déclaré" "$(grep -n -E 'google-fonts|^  fonts:' "$setup")"
+  bare=$(grep -n 'fontFamily: theme\.fonts\.' "$setup" | grep -vE 'fontFamily: theme\.fonts\.(title|body), fontWeight: theme\.fontWeights\.\1\b' || true)
+  [[ -z $bare ]] && pass "$case_name : chaque police d'une scène vient avec sa graisse du thème" \
+    || fail "$case_name : chaque police d'une scène vient avec sa graisse du thème" "$(head -n 3 <<<"$bare")"
+done
+
 # timing-voiceover.ts: the src/timing.ts that sync-voiceover lays, byte for byte the one of the
 # eval cases of a project synced to its voiceover, with the msToFrame of timing.ts unchanged.
 SYNCED="$PLUGIN_ROOT/evals/sync-voiceover/sync-voiceover-captions/setup.sh"

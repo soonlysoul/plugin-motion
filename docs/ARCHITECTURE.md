@@ -2,7 +2,7 @@
 
 2026-10-23 · Soon · PRD : `docs/PRD.md`
 
-**Statut : APPROUVÉ** le 2026-10-23 (« oui »).
+**Statut : APPROUVÉ** le 2026-11-01 (« Je valide »).
 
 ## Modèle
 
@@ -21,7 +21,7 @@ Trois couches, chacune à sa place :
 Le parcours :
 
 ```
-new-video      : dossier → create-video --blank → remotion skills add → templates/ → doctor.sh
+new-video      : dossier → create-video --blank → remotion skills add → remotion add @remotion/google-fonts → templates/ → doctor.sh
 storyboard     : brief → storyboard.md (format, scènes « à faire ») → accord de Soon
 build-scene    : storyboard.md → scène suivante → src/scenes/<Scene>.tsx + composition
                → preview.sh → frame-reviewer → corrections → « construite » → validation → « validée »
@@ -38,7 +38,7 @@ Un dossier par vidéo, à l'emplacement tranché dans le PRD :
 | Fichier | Écrit par | Contenu |
 | --- | --- | --- |
 | `storyboard.md` | `storyboard`, `build-scene`, `sync-voiceover` | La source de vérité : format (largeur, hauteur, cadence), puis pour chaque scène son identifiant, sa durée en images, son texte, l'intention du mouvement, ses repères de voix off et son statut (`à faire`, `construite`, `validée`). Ces données forment un bloc ` ```json ` en tête du fichier, lu par jq ; le texte libre de chaque scène suit en dessous. |
-| `src/theme.ts` | `new-video` (modèle), `storyboard` | Couleurs, polices, courbes d'accélération, durées types. Les scènes n'écrivent aucune couleur ni police en dur. |
+| `src/theme.ts` | `new-video` (modèle), `storyboard` | Couleurs, polices et leur graisse, courbes d'accélération, durées types. Les polices sont des Google Fonts, chargées en tête du fichier par `@remotion/google-fonts`, que le rendu attend ; il les télécharge de fonts.gstatic.com, donc demande le réseau ; un nom de police seul n'est pas chargé, et le rendu prend une police de repli. Les scènes n'écrivent aucune couleur, police ni graisse en dur. |
 | `src/scenes/<Scene>.tsx` | `build-scene` | Une composition par scène |
 | `src/Root.tsx` | `build-scene` | Une `Composition` par scène, plus la composition complète `Video`, qui enchaîne les scènes |
 | `src/timing.ts` | `new-video` (modèle), `sync-voiceover` | Conversion des millisecondes en numéro d'image (`Math.round(ms * fps / 1000)`) ; à la première synchronisation, `templates/timing-voiceover.ts` le remplace et y ajoute l'accès aux mots de `voiceover.json` et `cueFrame(scene, n)`, l'image d'un repère depuis le début de sa scène |
@@ -74,7 +74,7 @@ Invocation des skills : déclenchement automatique par leur description, et touj
 
 | Skill | Appelle | S'arrête |
 | --- | --- | --- |
-| `new-video` | `npx create-video --yes --blank`, `npx remotion skills add`, `templates/`, `doctor.sh` | refuse un dossier non vide ; sur un échec de `doctor.sh`, s'arrête avec la correction à appliquer, sans rien modifier du système |
+| `new-video` | `npx create-video --yes --blank`, `npx remotion skills add`, `npx remotion add @remotion/google-fonts`, `templates/`, `doctor.sh` | refuse un dossier non vide ; sur un échec de `doctor.sh`, s'arrête avec la correction à appliquer, sans rien modifier du système |
 | `storyboard` | — | après l'accord de Soon sur `storyboard.md` ; aucun code écrit |
 | `build-scene` | `preview.sh`, l'agent `frame-reviewer` | après une scène, passée en `validée` ou rendue à Soon avec ses défauts restants |
 | `sync-voiceover` | `transcribe.sh` (ffmpeg, `whisper-cpp`), `cues.sh`, `preview.sh` | après le recalage, scènes touchées repassées en `construite` |
@@ -82,7 +82,7 @@ Invocation des skills : déclenchement automatique par leur description, et touj
 
 `new-video` :
 
-- demande le dossier et le nom de la vidéo, puis lance `npx create-video --yes --blank <dossier>` et `npx remotion skills add` (réseau : npm) ;
+- demande le dossier et le nom de la vidéo, puis lance `npx create-video --yes --blank <dossier>`, `npx remotion skills add` et `npx remotion add @remotion/google-fonts` (réseau : npm) ;
 - copie depuis `templates/` : `src/theme.ts`, `src/timing.ts` et un `storyboard.md` vide au format par défaut tranché dans le PRD ;
 - lance `doctor.sh` et présente son diagnostic ; termine en proposant `storyboard`.
 
@@ -90,7 +90,7 @@ Invocation des skills : déclenchement automatique par leur description, et touj
 
 - pose les questions qui manquent au brief, une à la fois (public, durée totale, ton, format si autre que celui par défaut) ;
 - écrit `storyboard.md` avec toutes les scènes en `à faire` ; la durée totale est la somme des durées des scènes ;
-- complète `theme.ts` d'après le ton (couleurs, polices, courbes) ;
+- complète `theme.ts` d'après le ton (couleurs, polices et leur graisse, courbes) ;
 - sur un storyboard existant, une scène modifiée repasse en `à faire`.
 
 `build-scene` :

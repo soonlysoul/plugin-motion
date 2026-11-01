@@ -10,6 +10,7 @@ cat >package.json <<'EOF'
   "scripts": { "dev": "remotion studio", "render": "remotion render" },
   "dependencies": {
     "@remotion/cli": "4.0.300",
+    "@remotion/google-fonts": "4.0.300",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "remotion": "4.0.300"
@@ -28,10 +29,18 @@ EOF
 cat >src/theme.ts <<'EOF'
 // Thème de la vidéo : les scènes ne lisent leurs couleurs, polices, courbes et durées qu'ici.
 import { Easing } from "remotion";
+// Polices : des Google Fonts, chargées ici par @remotion/google-fonts ; le rendu attend qu'elles soient prêtes.
+import { loadFont as loadTitleFont } from "@remotion/google-fonts/ArchivoBlack";
+import { loadFont as loadBodyFont } from "@remotion/google-fonts/Inter";
+
+const fontWeights = { title: "400", body: "400" } as const;
+const title = loadTitleFont("normal", { weights: [fontWeights.title], subsets: ["latin"] });
+const body = loadBodyFont("normal", { weights: [fontWeights.body], subsets: ["latin"] });
 
 export const theme = {
   colors: { background: "#14141f", text: "#ffffff", accent: "#ffcc00" },
-  fonts: { title: "Archivo Black", body: "Inter" },
+  fonts: { title: title.fontFamily, body: body.fontFamily },
+  fontWeights,
   easing: { enter: Easing.out(Easing.back(1.6)), exit: Easing.in(Easing.cubic) },
   durations: { enter: 10, hold: 20, exit: 8 },
 } as const;
@@ -47,7 +56,7 @@ import { theme } from "../theme";
 
 export const $scene: React.FC<{ text: string }> = ({ text }) => (
   <AbsoluteFill style={{ backgroundColor: theme.colors.background, color: theme.colors.text }}>
-    <h1 style={{ fontFamily: theme.fonts.title }}>{text}</h1>
+    <h1 style={{ fontFamily: theme.fonts.title, fontWeight: theme.fontWeights.title }}>{text}</h1>
   </AbsoluteFill>
 );
 EOF

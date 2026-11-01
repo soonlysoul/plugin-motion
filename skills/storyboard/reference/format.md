@@ -61,8 +61,23 @@ One `## <id>` section per scene, in the order of the block, with the same identi
 
 | Ton | Easing | Durations | Colours and fonts |
 | --- | --- | --- | --- |
-| dynamique, énergique | entries with overshoot (`Easing.out(Easing.back(1.6))`) | short: entry 8 to 12 frames | strong contrast, one saturated accent, heavy title font |
-| calme, posé | `Easing.inOut(Easing.cubic)` | long: entry 20 to 30 frames | soft contrast, muted palette, light font |
-| sérieux, institutionnel | `Easing.out(Easing.cubic)` | medium: entry 15 frames | neutral palette, one accent, sober sans-serif |
+| dynamique, énergique | entries with overshoot (`Easing.out(Easing.back(1.6))`) | short: entry 8 to 12 frames | strong contrast, one saturated accent, heavy title font (Archivo Black 400, Anton 400) |
+| calme, posé | `Easing.inOut(Easing.cubic)` | long: entry 20 to 30 frames | soft contrast, muted palette, light font (Nunito 300, Lora 400) |
+| sérieux, institutionnel | `Easing.out(Easing.cubic)` | medium: entry 15 frames | neutral palette, one accent, sober sans-serif (Inter, IBM Plex Sans) |
 
 Another tone: choose by analogy, and say the choice in the approval message.
+
+### Fonts
+
+The fonts are Google Fonts, loaded at the top of `theme.ts` by `@remotion/google-fonts`, which the render waits for. A family only named, never loaded, renders in a fallback font, and the contact sheets lie about the layout. Two roles, `title` and `body`, one weight each:
+
+```ts
+import { loadFont as loadTitleFont } from "@remotion/google-fonts/ArchivoBlack";
+import { loadFont as loadBodyFont } from "@remotion/google-fonts/Inter";
+
+const fontWeights = { title: "400", body: "400" } as const;
+```
+
+- A font is its module: the family name as Google Fonts writes it, without spaces (« Archivo Black » gives `ArchivoBlack`, « IBM Plex Sans » `IBMPlexSans`, « DM Sans » `DMSans`). The same font for both roles keeps both lines.
+- Its weight goes in `fontWeights`, among those the font has: `node_modules/@remotion/google-fonts/dist/cjs/<Module>.d.ts` lists them under `weights` — Archivo Black has only `400`. A weight it lacks stops the render and `tsc`. That file absent: the name is misspelt, or the font is not on Google Fonts; take a close Google Font and say so.
+- Change only those two import lines and `fontWeights`: the `loadFont` calls, `subsets: ["latin"]`, `theme.fonts` and `theme.fontWeights` stay as they are.

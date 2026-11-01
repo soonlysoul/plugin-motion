@@ -36,7 +36,8 @@ Eight frames at most. Say that they become a contact sheet, reviewed by an indep
 
 Use the official Remotion skills of the project (`.claude/skills/`) for the API. The scene is `src/scenes/<id>.tsx`, a component named `<id>`:
 
-- Every colour, font, easing curve and typical duration comes from `src/theme.ts`; none written in the scene. A value missing from the theme goes into it, with its key, after the existing ones.
+- Every colour, font, font weight, easing curve and typical duration comes from `src/theme.ts`; none written in the scene. A text takes its font with its weight: `fontFamily: theme.fonts.title, fontWeight: theme.fontWeights.title`, or `body`. A value missing from the theme goes into it, with its key, after the existing ones.
+- Fonts are loaded only in `src/theme.ts`, by `@remotion/google-fonts`. A theme that only names its fonts (`fonts: { title: "Inter", … }`, no `loadFont`) renders them in a fallback font: say so before writing the scene, and propose to load them as `${CLAUDE_PLUGIN_ROOT}/templates/theme.ts` does, with `npx remotion add @remotion/google-fonts` when `package.json` lacks it — on Soon's yes only.
 - The text is the storyboard's, word for word, lines as `\n` gives them.
 - Sizes and positions follow the format, read with `useVideoConfig()`: text stays inside the central 90 % of the width and the height, wraps rather than leaves the frame — never `whiteSpace: "nowrap"` on a title — and its size fits its longest line.
 - Timings in frames, from the theme; voiceover cues only through `src/timing.ts`, never a frame number written by hand.

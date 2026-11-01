@@ -52,6 +52,7 @@ cat >package.json <<'JSON'
   "scripts": { "dev": "remotion studio", "render": "remotion render" },
   "dependencies": {
     "@remotion/cli": "4.0.300",
+    "@remotion/google-fonts": "4.0.300",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "remotion": "4.0.300"
@@ -72,10 +73,18 @@ TS
 cat >src/theme.ts <<'TS'
 // Thème de la vidéo : les scènes ne lisent leurs couleurs, polices, courbes et durées qu'ici.
 import { Easing } from "remotion";
+// Polices : des Google Fonts, chargées ici par @remotion/google-fonts ; le rendu attend qu'elles soient prêtes.
+import { loadFont as loadTitleFont } from "@remotion/google-fonts/ArchivoBlack";
+import { loadFont as loadBodyFont } from "@remotion/google-fonts/Inter";
+
+const fontWeights = { title: "400", body: "400" } as const;
+const title = loadTitleFont("normal", { weights: [fontWeights.title], subsets: ["latin"] });
+const body = loadBodyFont("normal", { weights: [fontWeights.body], subsets: ["latin"] });
 
 export const theme = {
   colors: { background: "#14141f", text: "#ffffff", accent: "#ffcc00" },
-  fonts: { title: "Archivo Black", body: "Inter" },
+  fonts: { title: title.fontFamily, body: body.fontFamily },
+  fontWeights,
   easing: { enter: Easing.out(Easing.back(1.6)), exit: Easing.in(Easing.cubic) },
   durations: { enter: 10, hold: 20, exit: 8 },
 } as const;
@@ -141,7 +150,7 @@ export const $scene: React.FC<{ text: string }> = ({ text }) => {
   const opacity = interpolate(frame, [0, theme.durations.enter], [0, 1], { extrapolateRight: "clamp", easing: theme.easing.enter });
   return (
     <AbsoluteFill style={{ backgroundColor: theme.colors.background, color: theme.colors.text, justifyContent: "center", alignItems: "center" }}>
-      <h1 style={{ fontFamily: theme.fonts.title, fontSize: 110, opacity }}>{text}</h1>
+      <h1 style={{ fontFamily: theme.fonts.title, fontWeight: theme.fontWeights.title, fontSize: 110, opacity }}>{text}</h1>
     </AbsoluteFill>
   );
 };
@@ -159,7 +168,7 @@ TSX
       echo "    interpolate(frame, [cueFrame(\"$scene\", cue), cueFrame(\"$scene\", cue) + theme.durations.enter], [0, 1], { extrapolateLeft: \"clamp\", extrapolateRight: \"clamp\", easing: theme.easing.enter });"
       echo '  return ('
       echo '    <AbsoluteFill style={{ backgroundColor: theme.colors.background, color: theme.colors.text, justifyContent: "center", alignItems: "center" }}>'
-      echo '      <h1 style={{ fontFamily: theme.fonts.title, fontSize: 110, opacity: enter(0) }}>{text}</h1>'
+      echo '      <h1 style={{ fontFamily: theme.fonts.title, fontWeight: theme.fontWeights.title, fontSize: 110, opacity: enter(0) }}>{text}</h1>'
       if [ "${cues[$scene]}" = 2 ]; then
         echo '      <div style={{ width: 120, height: 12, backgroundColor: theme.colors.accent, transform: `scaleX(${enter(1)})` }} />'
       fi

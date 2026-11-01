@@ -1,11 +1,11 @@
 # PROGRESS — plugin-motion
 
-Dernière mise à jour : 2026-10-30
+Dernière mise à jour : 2026-11-01
 Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Le critère 3 est tenu depuis le 2026-10-30, en pilotage headless (voir « Critère 3 »), et le critère 6 le même jour, les cinq suites relancées sur la 0.1.0 (voir « Critère 6 ») : les six critères du PRD sont tenus. Reste à trancher pour Soon : la police nommée par `templates/theme.ts` (« Inter »), qu'aucun fichier du projet vidéo ne charge.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Le critère 3 est tenu depuis le 2026-10-30, en pilotage headless (voir « Critère 3 »), et le critère 6 le même jour, les cinq suites relancées sur la 0.1.0 (voir « Critère 6 ») : les six critères du PRD sont tenus. Les polices du thème sont chargées depuis le 2026-11-01 (voir « Polices du thème ») ; `docs/ARCHITECTURE.md` approuvée de nouveau le même jour, et les suites de `new-video`, `storyboard` et `build-scene` vertes sur ce changement.
 
 ## Composants
 
@@ -902,3 +902,52 @@ verdict : vert
 **Critère 6 tenu** : les 22 cas des cinq suites passent sur leurs trois exécutions, sur la 0.1.0 — `new-video`, `render-video` et `sync-voiceover` au premier passage (`*-critere6-20261030T14*` et `T15*`), `storyboard` et `build-scene` au second (`*-critere6b-*`). Coût : 34,89 USD, au-delà des 28 annoncés. Deux votes restent partagés, gagnés à la majorité : `scene-back-to-do` de `storyboard-change-scene` (PFP), critère non découpé, et `review-before-validation` de `build-scene-fix-overflow` (PPF). Les juges d'un mot gardent du bruit ; un critère de plusieurs points qui rougit est à découper de la même façon.
 
 Remarque des réponses de `build-scene-first-scene`, avec et sans le plugin : « Archivo Black », la police du thème de la scène de test, n'est chargée nulle part. Même défaut que « Inter » dans `templates/theme.ts`, que rien ne charge dans un projet vidéo (voir « Critère 3 »).
+
+## Polices du thème — 2026-11-01
+
+Défaut : `templates/theme.ts` nommait « Inter » (`fonts: { title: "Inter", body: "Inter" }`) sans que rien la charge, et ni Inter ni Archivo Black ne sont installées sur le poste. Essai sur une copie du projet du critère 3 (Remotion 4.0.539), `npx remotion still Titre --frame=89` : avant, le titre sort dans une police de repli à empattements, sur une ligne ; après `npx remotion add @remotion/google-fonts` (4.0.539, `--save-exact`) et le thème chargé, en Inter Bold, sur deux lignes : Inter est plus large. La planche de `Titre` validée au critère 3 ne montrait donc pas la mise en page réelle.
+
+Choix, accord de Soon : `@remotion/google-fonts`, que recommande le skill officiel `remotion-markup` (`google-fonts.md`). Lu dans le paquet 4.0.539 : chaque police est un module (`@remotion/google-fonts/ArchivoBlack`), `loadFont` bloque le rendu par `delayRender` jusqu'à la police chargée, télécharge le woff2 de fonts.gstatic.com (deux nouvelles tentatives, puis le rendu échoue au bout de 60 s, label « Fetching … font » : pas de repli silencieux), lève une erreur sur une graisse que la police n'a pas, et refusera sous Remotion v5 un appel sans graisses ni sous-ensembles. Les types donnent les graisses de chaque police : `tsc` refuse `"700"` pour Archivo Black (`TS2322: Type '"700"' is not assignable to type '"400"'`) et accepte `"400"`.
+
+Forme du thème : deux imports `loadFont as loadTitleFont` et `loadFont as loadBodyFont`, `const fontWeights = { title: "700", body: "400" } as const`, un appel `loadFont("normal", { weights: [fontWeights.<rôle>], subsets: ["latin"] })` par rôle, `fonts: { title: title.fontFamily, body: body.fontFamily }` et la clé `fontWeights` dans `theme`. Le sous-ensemble `latin` couvre le français (œ, ç, é, tiret cadratin). Deux imports du même module passent `eslint` (`@remotion/eslint-config-flat`) et `tsc`.
+
+Rouge, avant le modèle :
+
+```
+$ bash tests/static/test_templates.sh
+  ÉCHEC  theme.ts charge la police du titre et celle du texte par @remotion/google-fonts
+  ÉCHEC  theme.ts donne une graisse par rôle, chargée et lue par les scènes (theme.fontWeights)
+  ÉCHEC  theme.fonts : les familles chargées, aucun nom écrit en dur
+  ÉCHEC  build-scene-add-scene : thème qui charge ses polices
+  …
+test_templates : 7 réussis, 22 échoués, 0 sautés
+exit 1
+```
+
+Vert, après le modèle et les 19 `setup.sh` réécrits par un même script (thème ; `"@remotion/google-fonts"` à la version de `remotion` dans `package.json` ; `fontWeight: theme.fontWeights.<rôle>` après chaque `fontFamily: theme.fonts.<rôle>` des scènes) : `test_templates : 48 réussis, 0 échoués, 0 sautés`, exit 0. Cinq mutations, chacune prise : graisse oubliée dans une scène, graisse d'un autre rôle, paquet non déclaré, nom de police écrit en dur dans le modèle, `loadFont` sans sous-ensemble. Les projets posés par `build-scene-resume`, `sync-voiceover-overflow` et `storyboard-brief-notes`, liés au `node_modules` de l'essai : `tsc` exit 0.
+
+Skills : `new-video` installe `@remotion/google-fonts` (étape 3.4, la copie des modèles devient 3.5) ; `storyboard` change une police par sa ligne d'import et sa graisse, lues dans `node_modules/@remotion/google-fonts/dist/cjs/<Module>.d.ts` (section « Fonts » de `format.md`, exemples par ton) ; `build-scene` écrit `fontFamily` avec `fontWeight` du thème, et signale un thème qui nomme ses polices sans les charger (projet de la 0.1.0), qu'il propose de convertir sur le oui de Soon. `pp.sh check-skill` : conforme ×3 ; `check-evals` : conforme ×5 ; `tests/run-all.sh` : 16 réussies ; `pp.sh check` : 0 écart. `docs/ARCHITECTURE.md` : ligne `src/theme.ts` et commandes de `new-video`, passée en REVUE, puis approuvée par Soon (« Je valide »).
+
+Essai réel de la chaîne de `new-video`, projet neuf du scratchpad : `create-video@latest --blank`, `remotion skills add`, `remotion add @remotion/google-fonts` (tout en 4.0.539), les trois modèles copiés tels quels ; `doctor.sh` : prêt, exit 0. Une scène `Essai` qui lit le thème (`tsc` et `eslint` : 0), `preview.sh <projet> Essai 0 15 29` : exit 0, titre en Inter 700 et texte en Inter 400, « œuvre, ça, été » rendus.
+
+Suites relancées sur les trois skills changés, deux bras, `--scaffold --keep-temp`, juge `sonnet` (« Je valide » de Soon, plafond 15 USD) ; `render-video` et `sync-voiceover` ne le sont pas : leurs skills ne changent pas, et leurs projets de test ne changent que par le texte du thème, que ces skills ne lisent pas :
+
+```
+new-video    new-video-polices-20261101T132204    vert, 4 cas                          2,64 USD
+storyboard   storyboard-polices-20261101T133128   vert, 5 cas                          3,69 USD
+build-scene  build-scene-polices-20261101T134632  rouge : add-scene WITH 0.83          6,69 USD
+```
+
+`build-scene-add-scene` (négatif, « Ajoute une scène sur les tarifs entre la 2 et la 3. ») : `build-scene` ne part dans aucune exécution, `storyboard` part dans les trois. Le juge `about-the-plan` refuse la première (FAIL PASS FAIL) : sans code, elle dit les 600 images déjà pleines et demande quelle scène raccourcit ; elle ne diffère des deux acceptées que par la place de la scène, « entre Message et Final », qu'elle ne redit pas. Même défaut qu'au critère 6 : un juge d'un mot sur un critère de quatre points (scène tarifs, sa place, le plan, aucun code). Sans lien avec les polices, que ni le cas ni la réponse n'abordent ; le cas passait 3 sur 3 le 2026-10-30.
+
+Correction, accord de Soon : `about-the-plan` découpé en `pricing-scene` (regex `tarif`, présente dans les six réponses gardées), `no-scene-code` et `plan-first`, juges d'un point au « FAIL only if » ; la place de la scène n'est plus jugée, le cas vérifiant qu'un ajout va au plan et non au code. `check-evals` : conforme. Relance du seul cas :
+
+```
+$ claude plugin eval . --case 'build-scene-add-scene' --no-publish --max-cost-usd 1.5 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/build-scene-polices-b-20261101T141527
+claude plugin eval : exit 0
+ok : build-scene-add-scene (négatif) : WITH 1.00, Δ +0.08
+coût : 1,02 USD
+verdict : vert
+```
+
+Votes unanimes sur les trois exécutions (PASS ×3 pour `no-scene-code` et `plan-first`). Coût des évaluations de ce changement : 14,04 USD.

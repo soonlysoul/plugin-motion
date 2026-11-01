@@ -32,9 +32,21 @@
       "arm": "both"
     },
     {
-      "name": "about-the-plan",
+      "name": "pricing-scene",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "tarif",
+      "flags": "i"
+    },
+    {
+      "name": "no-scene-code",
       "type": "llm",
-      "criteria": "PASS if the final reply deals with adding a scene about pricing between Message and Final in the plan, storyboard.md, and neither writes nor proposes the code of that scene (no .tsx, no Composition).\nFAIL if it writes or shows the code of a scene, or ignores the plan.\n"
+      "criteria": "PASS if the final reply shows no code of a scene, including when it names a file such as src/scenes/Final.tsx or says the code comes later with build-scene.\nFAIL only if it writes or shows the code of a scene: TSX or JSX, a React component, or a <Composition>.\n"
+    },
+    {
+      "name": "plan-first",
+      "type": "llm",
+      "criteria": "PASS if the final reply deals with the new scene in the plan, storyboard.md: it adds it, proposes its place or duration in the plan, or asks what the plan needs first (which scene gives way, the text of the prices), including when nothing is written yet.\nFAIL only if it ignores the plan and storyboard.md entirely.\n"
     }
   ]
 }

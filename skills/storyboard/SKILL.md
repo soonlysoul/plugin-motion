@@ -33,7 +33,7 @@ Then ask the first element still missing, in this order: public, durée totale, 
 2. Give each scene its duration in frames, a whole number. The durations add up to the total exactly: adjust the last scene, never the total.
 3. Write each scene as `format.md` says: an identifier, its duration, its text word for word, the intent of its motion in words, its voiceover cues, and the status `à faire`.
 4. Write `storyboard.md`: the JSON block, then the brief, then one section per scene. Keep the format of the block exactly; the scripts read it with jq.
-5. Set the values of `src/theme.ts` from the tone: colours, fonts, easing curves, typical durations, as `format.md` says. Change values only, never its keys or its shape.
+5. Set the values of `src/theme.ts` from the tone: colours, fonts and their weights, easing curves, typical durations, as `format.md` says. Change values only, never its keys or its shape; a font changes by its import line, never by a name written in `fonts`.
 
 ## 4. Change a plan that exists
 

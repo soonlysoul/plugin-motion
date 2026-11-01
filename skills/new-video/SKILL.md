@@ -31,7 +31,8 @@ Say that these commands use the network (npm, GitHub), then run them. `<dossier>
 1. `mkdir -p <parent>`, the parent folder of `<dossier>`.
 2. `npx --yes create-video@latest --yes --blank <dossier>`: the blank template. It installs the dependencies, about 350 packages, and makes a first git commit.
 3. In `<dossier>`: `npx remotion skills add`. It installs the official Remotion skills in `.agents/skills/`, links them for Claude Code in `.claude/skills/`, and writes `skills-lock.json`.
-4. Copy the templates of the plugin with `cp`, unchanged — storyboard and the scripts read them as they are:
+4. In `<dossier>`: `npx remotion add @remotion/google-fonts`, at the version of `remotion`. `src/theme.ts` loads its fonts with it; without it, no scene builds.
+5. Copy the templates of the plugin with `cp`, unchanged — storyboard and the scripts read them as they are:
    - `${CLAUDE_PLUGIN_ROOT}/templates/theme.ts` to `<dossier>/src/theme.ts`;
    - `${CLAUDE_PLUGIN_ROOT}/templates/timing.ts` to `<dossier>/src/timing.ts`;
    - `${CLAUDE_PLUGIN_ROOT}/templates/storyboard.md` to `<dossier>/storyboard.md`: the default format, 1920×1080 at 30 fps, with no scene.
@@ -50,4 +51,4 @@ Present the diagnosis as a table: check, status, what it found, correction. Then
 
 ## 5. Propose the storyboard
 
-Once the diagnosis is ready, say what was laid: the folder, the official Remotion skills, `src/theme.ts`, `src/timing.ts`, `storyboard.md`. Then propose the storyboard: open Claude Code in the folder (`cd <dossier> && claude`), where the official Remotion skills load, and give the brief of the video; `/plugin-motion:storyboard` takes it there.
+Once the diagnosis is ready, say what was laid: the folder, the official Remotion skills, `@remotion/google-fonts`, `src/theme.ts` and its fonts (Inter, until the storyboard sets them), `src/timing.ts`, `storyboard.md`. Then propose the storyboard: open Claude Code in the folder (`cd <dossier> && claude`), where the official Remotion skills load, and give the brief of the video; `/plugin-motion:storyboard` takes it there.
