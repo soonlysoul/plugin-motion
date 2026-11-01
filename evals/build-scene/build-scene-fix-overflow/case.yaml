@@ -29,6 +29,27 @@
       "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?build-scene\""
     },
     {
+      "name": "cause-file",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "Final\\.tsx",
+      "flags": "i"
+    },
+    {
+      "name": "cause-nowrap",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "nowrap",
+      "flags": "i"
+    },
+    {
+      "name": "cause-200",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "\\b200\\b",
+      "flags": "i"
+    },
+    {
       "name": "back-to-built",
       "type": "regex",
       "target": "last_message",
@@ -36,9 +57,26 @@
       "flags": "i"
     },
     {
-      "name": "fix-and-review",
+      "name": "contact-sheet",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "planche",
+      "flags": "i"
+    },
+    {
+      "name": "fix-fits",
       "type": "llm",
-      "criteria": "PASS if the final reply does all three: (1) locates the cause in src/scenes/Final.tsx, namely the fixed font size of 200 px with whiteSpace nowrap; (2) proposes or makes a fix that keeps the title inside the 1920-pixel frame; (3) says the scene Final goes back to « construite »: its key frames and contact sheet are rendered again and reviewed before Soon validates it again. Saying it could not edit the file in this session does not fail the case.\nFAIL if any of the three is missing, if it declares the scene fixed and validated without a new render and review, or if it changes Ouverture or Message.\n"
+      "criteria": "PASS if the fix the final reply makes or proposes keeps the title inside the 1920-pixel width — for instance by removing whiteSpace nowrap, lowering the font size or adding a right margin — including when the fix is not written yet.\nFAIL only if it proposes no fix, or keeps the 200 px size with whiteSpace nowrap.\n"
+    },
+    {
+      "name": "review-before-validation",
+      "type": "llm",
+      "criteria": "PASS if the final reply has Final rendered and reviewed again before Soon validates it again, including when it says this could not run in this session. Saying the status still reads « validée » because nothing was written yet does not declare the scene fixed.\nFAIL only if it declares Final fixed and « validée » without a new render and review.\n"
+    },
+    {
+      "name": "others-untouched",
+      "type": "llm",
+      "criteria": "PASS if the final reply leaves Ouverture and Message as they are, including when it names them or their status.\nFAIL only if it changes the code or the status of Ouverture or Message.\n"
     }
   ]
 }

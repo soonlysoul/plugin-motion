@@ -5,7 +5,7 @@ Reprise : lire ce fichier, puis `git log --oneline`.
 
 ## État courant
 
-Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Le critère 3 est tenu depuis le 2026-10-30, en pilotage headless (voir « Critère 3 »). Reste le critère 6, les suites d'évaluation de chaque skill.
+Charpente posée par plugin-plugin le 2026-10-23, à partir du cadrage approuvé (`docs/PRD.md`, `docs/ARCHITECTURE.md`). Six composants : l'agent `frame-reviewer` (US-4), les skills `storyboard` (US-2, US-7), `new-video` (US-1), `build-scene` (US-3, US-4, US-7), `render-video` (US-6, US-7) et `sync-voiceover` (US-5), avec `scripts/doctor.sh`, `scripts/preview.sh`, `scripts/probe.sh`, `scripts/transcribe.sh`, `scripts/cues.sh` et `templates/`. Les deux hypothèses du PRD sont tranchées, et le critère 2 est tenu sur le poste depuis le 2026-10-25 (voir `new-video`). `probe.sh` déclare conforme un vrai rendu de Remotion, et la suite de `render-video` montre qu'il ne prend pas la place du skill officiel `remotion-render`, chargé dans chaque session (voir `render-video`). Le critère 5 est tenu sur un extrait de Soon (voir `sync-voiceover`), le critère 4 depuis le 2026-10-29 (voir `frame-reviewer`). Le critère 3 est tenu depuis le 2026-10-30, en pilotage headless (voir « Critère 3 »), et le critère 6 le même jour, les cinq suites relancées sur la 0.1.0 (voir « Critère 6 ») : les six critères du PRD sont tenus. Reste à trancher pour Soon : la police nommée par `templates/theme.ts` (« Inter »), qu'aucun fichier du projet vidéo ne charge.
 
 ## Composants
 
@@ -860,3 +860,45 @@ Dossier `lancement-appli/` neuf, hors du dépôt. Chaque skill dans sa session `
 - l'étape 3.4 de `new-video` (`cp` des trois modèles depuis `templates/`) est refusée dans la session headless, avec ou sans `--add-dir` : le contrôle de permissions voit la source comme un fichier « sensible ». La session s'est arrêtée là sans contourner. J'ai fait les trois `cp` moi-même, sans changement, puis la suite est repartie ; c'est une limite du harnais de test, pas du skill. En session interactive, Soon répond à la demande d'autorisation ;
 - les « oui » aux trois planches sont les miens, après avoir ouvert chaque `planche.png` : lisibles, rien ne déborde. Le rythme et le goût de Soon n'y sont pas jugés ; deux remarques du relecteur restent pour lui : les mots de `Titre` entrent calés à gauche et ne se centrent qu'au dernier, et « Inter » n'est pas chargée dans le projet (repli sur la police du système) ;
 - le brief donne les quatre éléments d'un coup, donc `storyboard` n'a posé aucune question ; le test ne couvre pas la conduite à une question par message, que `evals/storyboard/` couvre.
+
+## Critère 6 — 2026-10-30
+
+Critère : chaque skill a une suite d'évaluation avec au moins un cas qui doit le déclencher et un qui ne le doit pas, sur trois exécutions par cas, toutes réussies. Chaque suite avait été verte, mais sur un état intermédiaire du plugin : `storyboard` et `new-video` avant que `build-scene`, `render-video` et `sync-voiceover` existent, et les négatifs de `sync-voiceover` avant la précision de son étape 6. Les cinq suites sont donc relancées sur la 0.1.0 (Claude Code 2.1.314), deux bras, `--scaffold --keep-temp`, juge `sonnet` partout, comme au dernier vert de `sync-voiceover` (« oui » de Soon, environ 28 USD annoncés) :
+
+```
+$ claude plugin eval . --case '<skill>-*' --no-publish --max-cost-usd <plafond> --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/<skill>-critere6-<horodatage>
+storyboard      rouge : brief-notes WITH 0.83, brief-vertical WITH 0.67   3,55 USD
+new-video       vert                                                      2,75 USD
+build-scene     rouge : first-scene WITH 0.83, fix-overflow WITH 0.83     5,35 USD
+render-video    vert                                                      4,66 USD
+sync-voiceover  vert                                                      8,86 USD
+```
+
+Le déclenchement tient partout : chaque skill part dans toutes ses exécutions positives avec le plugin et dans aucune négative. Les cinq exécutions refusées le sont par un juge `llm` à plusieurs points (`one-question-first` ×3, `scene-plan`, `fix-and-review`), sur des réponses qui remplissent chacun de ces points et ressemblent presque mot pour mot à celles qu'il accepte dans le même cas : `brief-notes` refusée (FAIL ×3) sur « 1920×1080 à 30 i/s — aucune scène », « 20 s, soit 600 images » et une seule question, sur le public. C'est le défaut constaté sur `sync-voiceover` : un juge d'un mot, sans réflexion, sur un critère de trois ou quatre points. Ces deux suites étaient vertes avec le juge par défaut, `haiku` ; le passage à `sonnet` a pu jouer.
+
+Correction, accord de Soon : les quatre critères découpés comme ceux de `sync-voiceover`. Des regex pour ce que le skill fait écrire tel quel — `storyboard` : la ligne d'état (`1920×1080 à 30 i/s`, `aucune scène`), `1080×1920` ; `build-scene` : `150 images`, `planche`, `indépendant|frame-reviewer`, `Final\.tsx`, `nowrap`, `200`. Des juges d'un seul point, au « FAIL only if » : `one-question`, `no-scene-proposed`, `not-validated`, `only-ouverture`, `fix-fits`, `review-before-validation`, `others-untouched`. Rejouées en JavaScript sur les 24 réponses gardées des quatre cas, les regex passent les 12 bras with et laissent chaque bras without en échec sur une au moins. Skills inchangés ; `check-evals` conforme pour les deux suites. Relance des deux suites (« oui » de Soon) :
+
+```
+$ claude plugin eval . --case 'storyboard-*' --no-publish --max-cost-usd 5 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/storyboard-critere6b-20261030T201850
+claude plugin eval : exit 0
+ok : storyboard-brief-notes (positif) : WITH 1.00, Δ +1.00
+ok : storyboard-brief-vertical (positif) : WITH 1.00, Δ +0.67
+ok : storyboard-change-scene (positif) : WITH 1.00, Δ +1.00
+ok : storyboard-new-project (négatif) : WITH 1.00, Δ +0.00
+ok : storyboard-render-request (négatif) : WITH 1.00, Δ +0.00
+coût : 3,80 USD
+verdict : vert
+$ claude plugin eval . --case 'build-scene-*' --no-publish --max-cost-usd 8 --keep-temp --scaffold --judge-model sonnet --output-dir ./evals/results/build-scene-critere6b-20261030T203633
+claude plugin eval : exit 0
+ok : build-scene-add-scene (négatif) : WITH 1.00, Δ +0.33
+ok : build-scene-first-scene (positif) : WITH 1.00, Δ +0.56
+ok : build-scene-fix-overflow (positif) : WITH 1.00, Δ +0.25
+ok : build-scene-render-request (négatif) : WITH 1.00, Δ +0.17
+ok : build-scene-resume (positif) : WITH 1.00, Δ +1.00
+coût : 5,92 USD
+verdict : vert
+```
+
+**Critère 6 tenu** : les 22 cas des cinq suites passent sur leurs trois exécutions, sur la 0.1.0 — `new-video`, `render-video` et `sync-voiceover` au premier passage (`*-critere6-20261030T14*` et `T15*`), `storyboard` et `build-scene` au second (`*-critere6b-*`). Coût : 34,89 USD, au-delà des 28 annoncés. Deux votes restent partagés, gagnés à la majorité : `scene-back-to-do` de `storyboard-change-scene` (PFP), critère non découpé, et `review-before-validation` de `build-scene-fix-overflow` (PPF). Les juges d'un mot gardent du bruit ; un critère de plusieurs points qui rougit est à découper de la même façon.
+
+Remarque des réponses de `build-scene-first-scene`, avec et sans le plugin : « Archivo Black », la police du thème de la scène de test, n'est chargée nulle part. Même défaut que « Inter » dans `templates/theme.ts`, que rien ne charge dans un projet vidéo (voir « Critère 3 »).

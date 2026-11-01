@@ -2,7 +2,7 @@
 
 2026-10-23 · Soon
 
-**Statut : APPROUVÉ** le 2026-10-23 (« oui »).
+**Statut : APPROUVÉ** le 2026-10-30 (« oui »).
 
 ## Problème
 
@@ -76,4 +76,4 @@ Aucune à ce jour.
 - Whisper : aucun moteur n'est installé ; le choix du moteur relève de l'architecture.
 - Licence : plugin-motion est sous MIT et n'embarque pas Remotion. La licence de Remotion s'applique à chaque projet vidéo : gratuite pour un individu ou une société de 3 personnes au plus ; au-delà, licence d'entreprise (environ 25 $ par siège et par mois selon des sources tierces, non confirmé sur la page officielle).
 - Banc d'essai d'octobre 2026 (agentskillshub) : Claude Opus 5.5 sans aucun skill produit déjà une vidéo de 15 s conforme en 4,4 min. La valeur du plugin est donc dans la méthode et la vérification, pas dans la connaissance de l'API.
-- L'extrait audio du critère 5 reste à fournir : enregistré par Soon ou libre de droits.
+- L'extrait audio du critère 5 a été enregistré par Soon le 2026-10-28 ; le critère y est tenu (voir `PROGRESS.md`, `sync-voiceover`).

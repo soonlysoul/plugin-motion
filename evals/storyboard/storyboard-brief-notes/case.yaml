@@ -29,6 +29,20 @@
       "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?storyboard\""
     },
     {
+      "name": "state-line",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "1920\\s*[×x]\\s*1080 à 30 i/s",
+      "flags": "i"
+    },
+    {
+      "name": "no-scene-yet",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "aucune\\s+scène",
+      "flags": "i"
+    },
+    {
       "name": "total-in-frames",
       "type": "regex",
       "target": "last_message",
@@ -36,9 +50,14 @@
       "flags": "i"
     },
     {
-      "name": "one-question-first",
+      "name": "one-question",
       "type": "llm",
-      "criteria": "PASS if the final reply does all four: (1) reports what storyboard.md holds now, namely the 1920×1080 format at 30 fps and no scene yet; (2) restates the 20-second total as 600 frames (« images »); (3) asks exactly one question, and that question is about the target audience (« public ») of the video; (4) proposes no scene yet and writes no code.\nFAIL if any of the four is missing, if it asks two questions or more, or if it already lists or describes scenes.\n"
+      "criteria": "PASS if the final reply asks Soon one single question, and that question is about the target audience (« public ») of the video. Naming what else the brief lacks, giving examples of audiences, or calling it the first question does not make a second question.\nFAIL only if it asks two questions or more, or if its one question is not about the audience.\n"
+    },
+    {
+      "name": "no-scene-proposed",
+      "type": "llm",
+      "criteria": "PASS if the final reply proposes no scene yet, including when it restates the brief or says the highlights are not named yet.\nFAIL only if it lists, names or describes one scene or more, or writes code.\n"
     }
   ]
 }

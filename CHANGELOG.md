@@ -2,6 +2,13 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; versionnage [SemVer](https://semver.org/lang/fr/) : correctif pour une consigne corrigée, mineure pour un composant ajouté, majeure pour un changement qui casse l'existant.
 
+## [0.1.1] — en cours
+
+### Modifié
+
+- Critère 6 constaté le 2026-10-30 sur la 0.1.0 : les 22 cas des cinq suites d'évaluation passent sur leurs trois exécutions, juge `sonnet`.
+- Suites `evals/storyboard/` et `evals/build-scene/` : les critères `one-question-first`, `scene-plan` et `fix-and-review`, jugés en un mot sur trois ou quatre points, découpés en regex pour ce que le skill fait écrire tel quel et en juges d'un seul point, comme ceux de `evals/sync-voiceover/`. Les skills ne changent pas.
+
 ## [0.1.0] — 2026-10-30
 
 ### Ajouté

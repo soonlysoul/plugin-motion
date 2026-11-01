@@ -29,15 +29,41 @@
       "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?build-scene\""
     },
     {
+      "name": "scene-duration",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "\\b150\\s+images\\b",
+      "flags": "i"
+    },
+    {
       "name": "last-frame",
       "type": "regex",
       "target": "last_message",
       "pattern": "\\b149\\b"
     },
     {
-      "name": "scene-plan",
+      "name": "contact-sheet",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "planche",
+      "flags": "i"
+    },
+    {
+      "name": "independent-reviewer",
+      "type": "regex",
+      "target": "last_message",
+      "pattern": "indépendant|frame-reviewer",
+      "flags": "i"
+    },
+    {
+      "name": "not-validated",
       "type": "llm",
-      "criteria": "PASS if the final reply does all four: (1) takes the scene Ouverture, the first of storyboard.md, and gives its duration of 150 frames (« images »); (2) lists by number the key frames it renders or will render, including frame 0 and frame 149, the last one; (3) says those frames are assembled into a contact sheet (« planche ») that an independent reviewer looks at before Soon validates the scene; (4) neither builds nor plans Message or Final. Saying it could not write the file in this session does not fail the case.\nFAIL if any of the four is missing, or if it treats the scene as validated.\n"
+      "criteria": "PASS if the final reply leaves Ouverture short of « validée », including when it does not give its status or says Soon validates the scene later.\nFAIL only if it says Ouverture is « validée » now, or already validated by Soon.\n"
+    },
+    {
+      "name": "only-ouverture",
+      "type": "llm",
+      "criteria": "PASS if the final reply builds or plans only the scene Ouverture, including when it lists Message and Final with their status. Saying it could not write the file in this session does not fail the case.\nFAIL only if it writes or plans code, key frames or a motion for Message or Final.\n"
     }
   ]
 }
